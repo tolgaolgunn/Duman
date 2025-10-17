@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { HomePage } from './components/HomePage';
-import { ProfilePage } from './components/ProfilePage';
+import { HomePage } from './pages/Home/HomePage';
+import { ProfilePage } from './pages/Profile/ProfilePage';
 import { ChatRoom } from './components/ChatRoom';
-import { TrendingPage } from './components/TrendingPage';
-import { SettingsPage } from './components/SettingsPage';
-import { LoginPage } from './components/LoginPage';
-import RegisterPage from './components/RegisterPage';
-import { ForgotPasswordPage } from './components/ForgotPasswordPage';
+import { TrendingPage } from './pages/Trending/TrendingPage';
+import { SettingsPage } from './pages/Settings/SettingsPage';
+import { LoginPage } from './pages/Login/LoginPage';
+import RegisterPage from './pages/Register/RegisterPage';
+import { ForgotPasswordPage } from './pages/Login/ForgotPasswordPage';
 
 type Page = 'home' | 'profile' | 'chat' | 'trending' | 'settings' | 'login' | 'register' | 'forgot-password';
 

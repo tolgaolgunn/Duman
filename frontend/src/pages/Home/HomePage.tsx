@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Filter, Image as ImageIcon } from 'lucide-react';
-import { mockPosts, currentUser } from '../lib/mockData';
-import { Post } from './Post';
+import { mockPosts, currentUser } from '../../lib/mockData';
+import { Post } from '../../components/Post';
 
 export function HomePage() {
   const [posts] = useState(mockPosts);

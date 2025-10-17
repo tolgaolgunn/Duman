@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Send, Users } from 'lucide-react';
-import { currentUser } from '../lib/mockData';
+import { currentUser } from '../../lib/mockData';
 
 interface Message {
   id: string;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Sparkles } from 'lucide-react';
-import { currentUser, mockPosts } from '../lib/mockData';
-import { Post } from './Post';
+import { currentUser, mockPosts } from '../../lib/mockData';
+import { Post } from '../../components/Post';
 
 export function ProfilePage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());

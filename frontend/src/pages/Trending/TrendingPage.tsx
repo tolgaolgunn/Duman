@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, Sparkles, ArrowUpRight } from 'lucide-react';
-import { currentUser, trendingTopics, mockPosts } from '../lib/mockData';
+import { currentUser, trendingTopics, mockPosts } from '../../lib/mockData';
 
 export function TrendingPage() {
   const sortedPosts = [...mockPosts].sort((a, b) => b.likes.length - a.likes.length);
