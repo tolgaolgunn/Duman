@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Bell, Lock, Palette, Sparkles, Shield } from 'lucide-react';
-import { currentUser, interestOptions } from '../lib/mockData';
+import { currentUser, interestOptions } from '../../lib/mockData';
 
 export function SettingsPage() {
   const [selectedInterests, setSelectedInterests] = useState<string[]>(currentUser.interests);
