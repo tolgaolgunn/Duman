@@ -67,13 +67,15 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
                   placeholder="Şifrenizi girin"
                   required
                 />
+                {/* Show Password Button */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
+                
               </div>
             </div>
 
@@ -114,17 +116,6 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
               </button>
             </p>
           </div>
-        </div>
-
-        {/* Back Button */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors mx-auto"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Ana sayfaya dön</span>
-          </button>
         </div>
       </div>
     </div>

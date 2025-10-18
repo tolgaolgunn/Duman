@@ -51,7 +51,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
 
       {/* User Info */}
       {isOpen && (
-        <div className="p-4 border-b border-gray-100">
+        <div className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
               <span className="text-2xl">{currentUser.avatar}</span>
@@ -65,13 +65,13 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
               </div>
               <p className="text-gray-500 text-sm">{currentUser.followers.length} takipçi</p>
             </div>
-          </div>
+          </div>  
         </div>
       )}
       
       {/* Collapsed User Avatar */}
       {!isOpen && (
-        <div className="p-4 border-b border-gray-100 flex justify-center">
+        <div className="p-4 border-b border-gray-100 flex justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
           <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
             <span className="text-2xl">{currentUser.avatar}</span>
           </div>

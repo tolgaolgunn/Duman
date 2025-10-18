@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ArrowLeft, Check } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Check, X } from 'lucide-react';
 
 interface RegisterData {
   username: string;
@@ -46,6 +46,30 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
         : [...prev.interests, interest]
     }));
   };
+
+  // Şifre gereksinimlerini kontrol et
+  const passwordRequirements = [
+    {
+      text: 'En az 6 karakter',
+      isValid: formData.password.length >= 6
+    },
+    {
+      text: 'Büyük harf içermeli',
+      isValid: /[A-Z]/.test(formData.password)
+    },
+    {
+      text: 'Küçük harf içermeli',
+      isValid: /[a-z]/.test(formData.password)
+    },
+    {
+      text: 'Rakam içermeli',
+      isValid: /\d/.test(formData.password)
+    },
+    {
+      text: 'Özel karakter içermeli (!@#$%^&*)',
+      isValid: /[!@#$%^&*(),.?":{}|<>]/.test(formData.password)
+    }
+  ];
 
   const validateForm = (): boolean => {
     setErrorMessage(null);
@@ -138,7 +162,16 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
         </div>
       )}
 
-      <div className="w-full max-w-2xl max-h-screen overflow-y-auto bg-white border border-gray-200 rounded-2xl p-8 pb-24">
+      <div className="w-full max-w-2xl max-h-screen overflow-y-auto bg-white border border-gray-200 rounded-2xl p-8 pb-24 relative">
+        {/* Back Button */}
+        <button
+          onClick={() => onNavigate('login')}
+          className="absolute top-4 left-4 flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm">Geri</span>
+        </button>
+        
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -184,19 +217,40 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600"
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600"
                   placeholder="En az 6 karakter"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
+
+            {/* Şifre Gereksinimleri */}
+            {formData.password && (
+              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xxs font-medium text-gray-700 mb-2">Şifre Gereksinimleri:</p>
+                <ul className="space-y-1">
+                  {passwordRequirements.map((requirement, index) => (
+                    <li key={index} className="flex items-center gap-2 text-xs">
+                      {requirement.isValid ? (
+                        <Check className="w-3 h-3 text-green-600 flex-shrink-0" />
+                      ) : (
+                        <X className="w-3 h-3 text-red-500 flex-shrink-0" />
+                      )}
+                      <span className={requirement.isValid ? 'text-green-600' : 'text-red-500'}>
+                        {requirement.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-2">Şifre Tekrar *</label>
@@ -205,14 +259,14 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                  className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600"
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600"
                   placeholder="Şifrenizi tekrar girin"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -251,7 +305,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
           <div className="mt-8">
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-all font-semibold"
+              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
             >
               Hesap Oluştur
             </button>
@@ -268,16 +322,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
               Giriş yapın
             </button>
           </p>
-        </div>
-
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mx-auto"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Ana sayfaya dön</span>
-          </button>
         </div>
       </div>
     </div>

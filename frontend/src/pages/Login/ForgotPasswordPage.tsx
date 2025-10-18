@@ -95,7 +95,16 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
         </div>
 
         {/* Reset Form */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-8">
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 relative">
+          {/* Back Button */}
+          <button
+            onClick={() => onNavigate('login')}
+            className="absolute top-4 left-4 flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">Geri</span>
+          </button>
+          
           <div className="text-center mb-6">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Mail className="w-6 h-6 text-gray-600" />
@@ -142,17 +151,6 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
               </button>
             </p>
           </div>
-        </div>
-
-        {/* Back Button */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => onNavigate('home')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors mx-auto"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Ana sayfaya dön</span>
-          </button>
         </div>
       </div>
     </div>

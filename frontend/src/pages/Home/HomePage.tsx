@@ -10,6 +10,8 @@ export function HomePage() {
   const [newPostContent, setNewPostContent] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const handleLike = (postId: string) => {
     setLikedPosts((prev) => {
@@ -33,6 +35,26 @@ export function HomePage() {
         ? prev.filter((i) => i !== interest)
         : [...prev, interest]
     );
+  };
+
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    console.log('Selected file:', file);
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        console.log('Image preview URL:', result);
+        setImagePreview(result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
   };
 
   const filteredPosts = selectedInterests.length > 0
@@ -115,15 +137,41 @@ export function HomePage() {
               rows={3}
             />
           </div>
+          
+          {/* Image Preview */}
+          {imagePreview && (
+            <div className="mt-3 relative">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-full h-48 object-cover rounded-xl border border-gray-200"
+              />
+              <button
+                onClick={handleRemoveImage}
+                className="absolute top-1 right-1 bg-red-500 text-black rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors text-xs font-bold z-10 shadow-lg"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          
           <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
-            <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-all">
+            <label className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-all cursor-pointer">
               <ImageIcon className="w-5 h-5" />
               <span className="text-sm">Resim Ekle</span>
-            </button>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </label>
             <button
               onClick={() => {
                 if (newPostContent.trim()) {
                   setNewPostContent('');
+                  setSelectedImage(null);
+                  setImagePreview(null);
                   setShowNewPost(false);
                 }
               }}
