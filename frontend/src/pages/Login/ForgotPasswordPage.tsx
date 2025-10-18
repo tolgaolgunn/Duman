@@ -29,8 +29,8 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-white text-2xl">💨</span>
+            <div className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <img src="/duman.svg" alt="Duman Logo" className="w-20 h-20" />
             </div>
             <h1 className="text-gray-800 text-3xl font-bold">Duman</h1>
           </div>
@@ -87,8 +87,8 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl">💨</span>
+          <div className="w-24 h-24 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <img src="/duman.svg" alt="Duman Logo" className="w-20 h-20" />
           </div>
           <h1 className="text-gray-800 text-3xl font-bold">Duman</h1>
           <p className="text-gray-600 mt-2">Şifrenizi mi unuttunuz?</p>

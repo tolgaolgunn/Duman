@@ -26,8 +26,8 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
         <div className={`flex items-center ${isOpen ? 'gap-3' : 'justify-center'}`}>
-          <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-xl flex items-center justify-center">
-            <span className="text-white">💨</span>
+          <div className="w-16 h-16 rounded-xl flex items-center justify-center">
+            <img src="/duman.svg" alt="Duman Logo" className="w-14 h-14" />
           </div>
           {isOpen && <h1 className="text-gray-800 flex-1">Duman</h1>}
           {onToggle && (
