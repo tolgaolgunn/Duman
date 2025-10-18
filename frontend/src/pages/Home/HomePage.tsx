@@ -164,6 +164,7 @@ export function HomePage() {
                 accept="image/*"
                 onChange={handleImageSelect}
                 className="hidden"
+                style={{ display: 'none' }}
               />
             </label>
             <button
