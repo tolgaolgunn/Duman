@@ -5,7 +5,7 @@ import { Post } from '../../components/Post';
 
 export function ProfilePage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<'posts' | 'liked' | 'interests'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'liked'>('posts');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({
     username: currentUser.username,
@@ -13,11 +13,11 @@ export function ProfilePage() {
     bio: '', // bio is not present on currentUser, initialize as empty string
     interests: currentUser.interests
   });
+  const [newInterest, setNewInterest] = useState('');
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+  const [showCoverMenu, setShowCoverMenu] = useState(false);
 
   const userPosts = mockPosts.filter((post) => post.author.id === currentUser.id);
-  
-  // Beğenilen gönderiler - gerçek uygulamada bu veriler backend'den gelir
-  // Mock data için: ilk 3 gönderiyi beğenilmiş olarak göster
   const likedPostsData = mockPosts.slice(0, 3);
 
   const handleLike = (postId: string) => {
@@ -61,7 +61,114 @@ export function ProfilePage() {
       bio: '', // bio property doesn't exist on currentUser, so keep as empty string
       interests: currentUser.interests
     });
+    setNewInterest('');
     setShowEditModal(false);
+  };
+
+  const handleAddInterest = () => {
+    if (newInterest.trim() && !editForm.interests.includes(newInterest.trim())) {
+      setEditForm({
+        ...editForm,
+        interests: [...editForm.interests, newInterest.trim()]
+      });
+      setNewInterest('');
+    }
+  };
+
+  const handlePhotoAction = (action: string) => {
+    console.log('Photo action:', action);
+    setShowPhotoMenu(false);
+    
+    switch (action) {
+      case 'add':
+        handleAddPhoto();
+        break;
+      case 'edit':
+        handleEditPhoto();
+        break;
+      case 'remove':
+        handleRemovePhoto();
+        break;
+      default:
+        console.log('Unknown photo action:', action);
+    }
+  };
+
+  const handleAddPhoto = () => {
+    // Dosya seçici oluştur
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        console.log('Yeni fotoğraf seçildi:', file.name);
+        // Burada gerçek uygulamada fotoğraf yükleme işlemi yapılır
+        alert(`Fotoğraf yüklendi: ${file.name}`);
+      }
+    };
+    input.click();
+  };
+
+  const handleEditPhoto = () => {
+    console.log('Fotoğraf düzenleme moduna geçiliyor');
+    // Burada gerçek uygulamada fotoğraf düzenleme arayüzü açılır
+    alert('Fotoğraf düzenleme özelliği yakında eklenecek!');
+  };
+
+  const handleRemovePhoto = () => {
+    const confirmed = window.confirm('Profil fotoğrafınızı kaldırmak istediğinizden emin misiniz?');
+    if (confirmed) {
+      console.log('Fotoğraf kaldırılıyor...');
+      // Burada gerçek uygulamada fotoğraf silme işlemi yapılır
+      alert('Profil fotoğrafı kaldırıldı!');
+    }
+  };
+
+  const handleCoverAction = (action: string) => {
+    console.log('Cover action:', action);
+    setShowCoverMenu(false);
+    
+    switch (action) {
+      case 'add':
+        handleAddCover();
+        break;
+      case 'edit':
+        handleEditCover();
+        break;
+      case 'remove':
+        handleRemoveCover();
+        break;
+      default:
+        console.log('Unknown cover action:', action);
+    }
+  };
+
+  const handleAddCover = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        console.log('Yeni cover fotoğrafı seçildi:', file.name);
+        alert(`Cover fotoğrafı yüklendi: ${file.name}`);
+      }
+    };
+    input.click();
+  };
+
+  const handleEditCover = () => {
+    console.log('Cover fotoğrafı düzenleme moduna geçiliyor');
+    alert('Cover fotoğrafı düzenleme özelliği yakında eklenecek!');
+  };
+
+  const handleRemoveCover = () => {
+    const confirmed = window.confirm('Cover fotoğrafınızı kaldırmak istediğinizden emin misiniz?');
+    if (confirmed) {
+      console.log('Cover fotoğrafı kaldırılıyor...');
+      alert('Cover fotoğrafı kaldırıldı!');
+    }
   };
 
   return (
@@ -159,16 +266,6 @@ export function ProfilePage() {
           >
             Beğendiklerim ({likedPostsData.length})
           </button>
-          <button
-            onClick={() => setActiveTab('interests')}
-            className={`flex-1 px-4 py-3 transition-all ${
-              activeTab === 'interests'
-                ? 'text-gray-800 border-b-2 border-gray-800'
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            İlgi Alanları
-          </button>
         </div>
       </div>
 
@@ -213,36 +310,19 @@ export function ProfilePage() {
         </div>
       )}
       
-      {activeTab === 'interests' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-6">
-          <h3 className="text-gray-900 mb-4">İlgi Alanlarını Yönet</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {currentUser.interests.map((interest) => (
-              <div
-                key={interest}
-                className="flex items-center justify-between p-3 bg-gray-100 rounded-xl"
-              >
-                <span className="text-gray-700">#{interest}</span>
-                <button className="text-gray-400 hover:text-red-500 transition-all">
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-          <button className="w-full mt-4 px-4 py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-xl hover:border-gray-400 hover:text-gray-800 transition-all">
-            + Yeni İlgi Alanı Ekle
-          </button>
-        </div>
-      )}
 
       {/* Debug Info */}
       <div className="fixed top-4 right-4 bg-black bg-opacity-75 text-white p-2 rounded text-xs" style={{ zIndex: 10001 }}>
-        showEditModal: {showEditModal ? 'true' : 'false'}
+        showEditModal: {showEditModal ? 'true' : 'false'} | showPhotoMenu: {showPhotoMenu ? 'true' : 'false'} | showCoverMenu: {showCoverMenu ? 'true' : 'false'}
       </div>
 
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div 
+          onClick={() => {
+            setShowPhotoMenu(false);
+            setShowCoverMenu(false);
+          }}
           style={{
             position: 'fixed',
             top: 0,
@@ -258,16 +338,18 @@ export function ProfilePage() {
           }}
         >
               {/* {console.log('Modal is rendering!')} */}
-              <div style={{
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              width: '100%',
-              maxWidth: '500px',
-              maxHeight: '90vh',
-              overflow: 'auto',
-              zIndex: 10000
-            }}
-          >
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                backgroundColor: 'white',
+                borderRadius: '16px',
+                width: '100%',
+                maxWidth: '500px',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                zIndex: 10000
+              }}
+            >
             
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -283,28 +365,87 @@ export function ProfilePage() {
             {/* Modal Content */}
             <div className="p-6 space-y-6">
               {/* Profile Picture */}
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center relative">
                 <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center border-4 border-white shadow-lg mb-4">
                   <span className="text-4xl">{currentUser.avatar}</span>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all">
-                  <Camera className="w-4 h-4" />
-                  <span className="text-sm">Fotoğraf Değiştir</span>
-                </button>
+                <div className="relative">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('Photo button clicked, current state:', showPhotoMenu);
+                      setShowPhotoMenu(!showPhotoMenu);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+                  >
+                    <span className="text-lg">📷</span>
+                    <span className="text-sm">Fotoğraf Değiştir</span>
+                  </button>
+                  
+                  {/* Photo Menu Dropdown */}
+                  {showPhotoMenu && (
+                    <div 
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50"
+                    >
+                      <div className="py-2">
+                        {/* Profile Photo Section */}
+                        <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          Profil Fotoğrafı
+                        </div>
+                        <button
+                          onClick={() => handlePhotoAction('add')}
+                          className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                        >
+                          <span className="text-lg">📁</span>
+                          <span>Profil Fotoğrafı Ekle</span>
+                        </button>
+                        <button
+                          onClick={() => handlePhotoAction('remove')}
+                          className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-3"
+                        >
+                          <span className="text-lg">🗑️</span>
+                          <span>Profil Fotoğrafı Kaldır</span>
+                        </button>
+                        
+                        <div className="border-t border-gray-100 my-1"></div>
+                        
+                        {/* Cover Photo Section */}
+                        <div className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          Kapak Fotoğrafı
+                        </div>
+                        <button
+                          onClick={() => handleCoverAction('add')}
+                          className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-3"
+                        >
+                          <span className="text-lg">📁</span>
+                          <span>Kapak Fotoğrafı Ekle</span>
+                        </button>
+                        <button
+                          onClick={() => handleCoverAction('remove')}
+                          className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center gap-3"
+                        >
+                          <span className="text-lg">🗑️</span>
+                          <span>Kapak Fotoğrafı Kaldır</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Username */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                  <span className="text-lg">👤</span>
                   Kullanıcı Adı
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
                     value={editForm.username}
                     onChange={(e) => setEditForm({...editForm, username: e.target.value})}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Kullanıcı adınızı girin"
                   />
                 </div>
@@ -312,16 +453,15 @@ export function ProfilePage() {
 
               {/* Email */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                   E-posta
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="email"
                     value={editForm.email}
                     onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="E-posta adresinizi girin"
                   />
                 </div>
@@ -329,7 +469,7 @@ export function ProfilePage() {
 
               {/* Bio */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                   Hakkında
                 </label>
                 <textarea
@@ -343,43 +483,50 @@ export function ProfilePage() {
 
               {/* Interests */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                   İlgi Alanları
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {editForm.interests.map((interest, index) => (
-                    <span
+                    <div
                       key={index}
-                      className="inline-flex items-center px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm"
+                      className="inline-flex items-center px-3 py-2 rounded-lg bg-white border-2 border-gray-200 text-gray-700 text-sm hover:border-gray-300 transition-colors"
                     >
-                      #{interest}
+                      <span className="mr-1">#{interest}</span>
                       <button
                         onClick={() => {
                           const newInterests = editForm.interests.filter((_, i) => i !== index);
                           setEditForm({...editForm, interests: newInterests});
                         }}
-                        className="ml-2 text-blue-500 hover:text-blue-700"
+                        className="ml-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700 transition-all text-sm font-bold"
+                        title="Kaldır"
                       >
-                        ✕
+                        ×
                       </button>
-                    </span>
+                    </div>
                   ))}
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 flex gap-2">
                   <input
                     type="text"
+                    value={newInterest}
+                    onChange={(e) => setNewInterest(e.target.value)}
                     placeholder="Yeni ilgi alanı ekle..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                        setEditForm({
-                          ...editForm,
-                          interests: [...editForm.interests, e.currentTarget.value.trim()]
-                        });
-                        e.currentTarget.value = '';
+                      if (e.key === 'Enter') {
+                        handleAddInterest();
                       }
                     }}
                   />
+                  <button 
+                    onClick={handleAddInterest}
+                    className="px-4 py-2 flex items-center justify-center rounded-xl border border-gray-300
+                      bg-blue-100 text-blue-600 hover:bg-blue-200 hover:text-blue-700 transition-all text-sm font-bold" 
+                    title="İlgi Alanı Ekle"
+                  >
+                    Ekle
+                  </button>
                 </div>
               </div>
             </div>
@@ -405,3 +552,4 @@ export function ProfilePage() {
     </div>
   );
 }
+
