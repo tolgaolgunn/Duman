@@ -17,8 +17,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// MongoDB bağlantısı"
-mongoose.connect(process.env.MONGO_URI, {
+// MongoDB bağlantısı (geçici olarak devre dışı)
+/*
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/duman', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
@@ -39,6 +40,9 @@ mongoose.connection.on('error', err => {
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected');
 });
+*/
+
+console.log('MongoDB connection temporarily disabled for development');
 
 app.use(express.json());
 app.use(cors({
