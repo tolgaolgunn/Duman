@@ -174,8 +174,8 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
         
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl">💨</span>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
+            <img src="/duman.png" alt="Duman Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-gray-800 text-3xl font-bold">Duman</h1>
           <p className="text-gray-600 mt-2">Yeni hesap oluşturun</p>
