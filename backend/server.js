@@ -1,0 +1,64 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
+import authRoute from './routes/authRoute.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const frontendPath = path.join(__dirname, '../frontend/build');
+
+dotenv.config();
+
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// MongoDB bağlantısı (geçici olarak devre dışı)
+/*
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/duman', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('MongoDB connected successfully');
+  console.log('Database:', mongoose.connection.db.databaseName);
+})
+.catch(err => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
+});
+
+// Bağlantı event'lerini dinle
+mongoose.connection.on('error', err => {
+  console.error('MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected');
+});
+*/
+
+console.log('MongoDB connection temporarily disabled for development');
+
+app.use(express.json());
+app.use(cors({
+  origin: 'http://localhost:5173',
+  credentials: true
+}));
+
+app.use(express.static(frontendPath));
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// Routes
+app.use('/api/auth', authRoute);
+
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
