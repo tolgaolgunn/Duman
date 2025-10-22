@@ -25,8 +25,8 @@ export const register = async (req, res) => {
 
 
     // Manuel hash yapalım
-    const hashedPassword = await bcrypt.hash(password, 12);
-    console.log('🟡 [3] Password hashed');
+    const hashedPassword = await bcrypt.hash(password, 10);
+  
 
     // Yeni kullanıcı oluştur
     const newUser = new User({ 
@@ -36,19 +36,19 @@ export const register = async (req, res) => {
       interests: interests 
     });
 
-    console.log('🟡 [4] User object created:', {
+    console.log(' User object created:', {
       username: newUser.username,
       email: newUser.email,
       interests: newUser.interests,
       passwordLength: newUser.password.length
     });
 
-    console.log('🟡 [5] Attempting to save user...');
+    console.log('Attempting to save user...');
     
     // Kullanıcıyı kaydet
     const savedUser = await newUser.save();
     
-    console.log('🟢 [6] USER SAVED SUCCESSFULLY:', {
+    console.log(' USER SAVED SUCCESSFULLY:', {
       id: savedUser._id,
       username: savedUser.username,
       email: savedUser.email,
@@ -59,7 +59,7 @@ export const register = async (req, res) => {
     // JWT token oluştur
     const token = jwt.sign({ id: savedUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
-    console.log('🟢 [7] Token created, sending response');
+    console.log('Token created, sending response');
 
     res.status(201).json({ 
       message: 'User registered successfully', 
@@ -84,13 +84,13 @@ export const register = async (req, res) => {
 
     if (err.code === 11000) {
       errorMsg = 'Email already exists';
-      console.log('🔴 Duplicate email error');
+      console.log('Duplicate email error');
     }
 
     if (err.name === 'ValidationError') {
       const errors = Object.values(err.errors).map(e => e.message);
       errorMsg = errors.join(', ');
-      console.log('🔴 Validation error:', errors);
+      console.log('Validation error:', errors);
     }
 
     res.status(400).json({ error: errorMsg });
