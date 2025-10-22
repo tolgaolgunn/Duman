@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Settings, Sparkles, X, Camera, User, Mail } from 'lucide-react';
 import { currentUser, mockPosts } from '../../lib/mockData';
 import { Post } from '../../components/Post';
@@ -7,11 +7,12 @@ export function ProfilePage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'posts' | 'liked'>('posts');
   const [showEditModal, setShowEditModal] = useState(false);
+  const [profile, setProfile] = useState({ username: currentUser.username, email: currentUser.email, interests: currentUser.interests });
   const [editForm, setEditForm] = useState({
-    username: currentUser.username,
-    email: currentUser.email,
+    username: profile.username,
+    email: profile.email,
     bio: '', // bio is not present on currentUser, initialize as empty string
-    interests: currentUser.interests
+    interests: profile.interests
   });
   const [newInterest, setNewInterest] = useState('');
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
@@ -40,6 +41,8 @@ export function ProfilePage() {
     console.log('Edit profile button clicked');
     console.log('Current showEditModal:', showEditModal);
     setShowEditModal(true);
+  // initialize edit form with latest profile
+  setEditForm({ username: profile.username, email: profile.email, bio: '', interests: profile.interests });
     console.log('setShowEditModal(true) called');
     
     // Test: setTimeout ile state'i kontrol et
@@ -47,6 +50,33 @@ export function ProfilePage() {
       console.log('After timeout, showEditModal should be true');
     }, 100);
   };
+
+  useEffect(() => {
+    // Fetch profile from backend using stored authToken
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+        const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+        const res = await fetch(`${API_BASE}/api/auth/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (!res.ok) {
+          console.error('Failed to load profile', res.status);
+          return;
+        }
+        const data = await res.json();
+        setProfile({ username: data.username, email: data.email, interests: data.interests || [] });
+        setEditForm({ username: data.username, email: data.email, bio: '', interests: data.interests || [] });
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleSaveProfile = () => {
     // Burada gerçek uygulamada API çağrısı yapılır
@@ -182,16 +212,16 @@ export function ProfilePage() {
         <div className="px-6 pb-6" >
           <div className="flex items-end gap-4 -mt-12 mb-4">
             <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
-              <span className="text-4xl">{currentUser.avatar}</span>
+              <span className="text-4xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
             </div>
             <div className="flex-1 mt-14">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-gray-900">@{currentUser.username}</h2>
+                <h2 className="text-gray-900">@{profile.username}</h2>
                 {currentUser.isPremium && (
                   <Sparkles className="w-5 h-5 text-yellow-500" />
                 )}
               </div>
-              <p className="text-gray-500">{currentUser.email}</p>
+              <p className="text-gray-500">{profile.email}</p>
             </div>
             <button 
               onClick={(e) => {
@@ -230,7 +260,7 @@ export function ProfilePage() {
           <div>
             <p className="text-gray-700 mb-2">İlgi Alanları:</p>
             <div className="flex flex-wrap gap-2">
-              {currentUser.interests.map((interest) => (
+              {(profile.interests || []).map((interest) => (
                 <span
                   key={interest}
                   className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm"

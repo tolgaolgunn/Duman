@@ -8,6 +8,7 @@ import { SettingsPage } from './pages/Settings/SettingsPage';
 import { LoginPage } from './pages/Login/LoginPage';
 import RegisterPage from './pages/Register/RegisterPage';
 import { ForgotPasswordPage } from './pages/Login/ForgotPasswordPage';
+import ResetPasswordPage from './pages/Login/ResetPasswordPage';
 import { Sidebar } from './components/Sidebar';
 
 // Layout component that includes sidebar
@@ -59,8 +60,8 @@ const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogin = (username: string, password: string) => {
-    console.log('Login attempt:', { username, password });
+  const handleLogin = (username: string, email: string,password: string) => {
+    console.log('Login attempt:', { username, email,password });
     setIsAuthenticated(true);
     localStorage.setItem('isAuthenticated', 'true');
     navigate('/home');
@@ -103,17 +104,68 @@ const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 // Wrapper components for auth pages
 const LoginPageWrapper: React.FC = () => {
   const navigate = useNavigate();
-  
   const handleNavigate = (path: string) => {
     navigate(`/${path}`);
   };
-  
-  const handleLogin = (username: string, password: string) => {
-    console.log('Login attempt:', { username, password });
-    // Set authentication state in localStorage or context
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate('/home');
-  };
+
+  // Base URL for API. Prefer Vite env var VITE_API_BASE, otherwise default to backend port 3000
+  const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+
+  const handleLogin = async (username: string, password: string) => {
+  try {
+    const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+    
+    console.log('Attempting login to:', `${API_BASE}/api/auth/login`);
+    
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        email: username, 
+        password 
+      })
+    });
+
+    console.log('Response status:', res.status);
+
+    if (!res.ok) {
+      // Handle different error cases
+      if (res.status === 404) {
+        throw new Error('API endpoint bulunamadı. Backend servisi çalışıyor mu?');
+      }
+      if (res.status === 401) {
+        throw new Error('Kullanıcı adı veya şifre hatalı');
+      }
+      throw new Error(`HTTP ${res.status}: Giriş başarısız`);
+    }
+
+    const data = await res.json();
+    
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    // Save token and mark authenticated
+    if (data.token) {
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('isAuthenticated', 'true');
+      navigate('/home');
+    } else {
+      throw new Error('Token alınamadı');
+    }
+    
+  } catch (err: any) {
+    console.error('Login failed:', err);
+    
+    // More specific error messages
+    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      throw new Error('Sunucuya bağlanılamıyor. Backend servisi çalıştığınızdan emin olun.');
+    }
+    throw new Error(err?.message || 'Giriş sırasında beklenmeyen bir hata oluştu');
+  }
+};
 
   return (
     <LoginPage 
@@ -151,8 +203,25 @@ const ForgotPasswordPageWrapper: React.FC = () => {
     navigate(`/${path}`);
   };
   
-  const handleResetPassword = (email: string) => {
-    console.log('Password reset requested for:', email);
+  const handleResetPassword = async (email: string) => {
+    const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let data = {} as any;
+        try { data = JSON.parse(text); } catch { data = { error: text }; }
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      return;
+    } catch (err: any) {
+      console.error('Forgot password failed', err);
+      throw new Error(err?.message || 'Şifre sıfırlama sırasında hata oluştu');
+    }
   };
 
   return (
@@ -220,6 +289,14 @@ const router = createBrowserRouter([
     path: '/forgot-password',
     element: <ForgotPasswordPageWrapper />,
   },
+  {
+    path: '/reset-password/:token',
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: '/reset-password/:token',
+    element: <ResetPasswordPage />,
+  }
 ]);
 
 export const AppRouter: React.FC = () => {

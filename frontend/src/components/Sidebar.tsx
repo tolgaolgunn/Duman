@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Home, User, MessageCircle, TrendingUp, Settings, LogOut, Sparkles } from 'lucide-react';
 import { currentUser } from '../lib/mockData';
 
@@ -11,6 +11,30 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onToggle }: SidebarProps) {
+  const [profile, setProfile] = useState<{ username?: string; email?: string; interests?: string[] }>({});
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+        const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+        const res = await fetch(`${API_BASE}/api/auth/profile`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        setProfile({ username: data.username, email: data.email, interests: data.interests || [] });
+      } catch (err) {
+        console.error('Sidebar fetch profile error', err);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
   const menuItems = [
     { id: 'home', label: 'Ana Sayfa', icon: Home },
     { id: 'profile', label: 'Profil', icon: User },
@@ -54,11 +78,11 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
         <div className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-              <span className="text-2xl">{currentUser.avatar}</span>
+              <span className="text-2xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-gray-900 truncate">@{currentUser.username}</p>
+                <p className="text-gray-900 truncate">@{profile.username || currentUser.username}</p>
                 {currentUser.isPremium && (
                   <Sparkles className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                 )}
@@ -73,7 +97,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       {!isOpen && (
         <div className="p-4 border-b border-gray-100 flex justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
           <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl">{currentUser.avatar}</span>
+            <span className="text-2xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
           </div>
         </div>
       )}

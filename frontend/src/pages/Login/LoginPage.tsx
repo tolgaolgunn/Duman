@@ -3,7 +3,7 @@ import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface LoginPageProps {
   onNavigate: (page: string) => void;
-  onLogin: (username: string, password: string) => void;
+  onLogin: (username: string, password: string) => Promise<void>;
 }
 
 export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
@@ -12,15 +12,20 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login process
-    setTimeout(() => {
-      onLogin(username, password);
+    setError(null);
+
+    try {
+      await onLogin(username, password);
+    } catch (err: any) {
+      setError(err?.message || 'Giriş başarısız');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -95,6 +100,10 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
                 Şifremi unuttum
               </button>
             </div>
+
+            {error && (
+              <div className="text-red-600 text-sm mb-2">{error}</div>
+            )}
 
             <button
               type="submit"

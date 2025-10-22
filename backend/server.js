@@ -17,8 +17,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// MongoDB bağlantısı (geçici olarak devre dışı)
-/*
+
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/duman', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -40,7 +39,7 @@ mongoose.connection.on('error', err => {
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected');
 });
-*/
+
 
 console.log('MongoDB connection temporarily disabled for development');
 
@@ -49,6 +48,8 @@ app.use(cors({
   origin: 'http://localhost:5173',
   credentials: true
 }));
+// Routes
+app.use('/api/auth', authRoute);
 
 app.use(express.static(frontendPath));
 app.use((req, res, next) => {
@@ -56,9 +57,9 @@ app.use((req, res, next) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-// Routes
-app.use('/api/auth', authRoute);
+
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Frontend served from ${frontendPath}`);
 });

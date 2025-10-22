@@ -3,7 +3,7 @@ import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 
 interface ForgotPasswordPageProps {
   onNavigate: (page: string) => void;
-  onResetPassword: (email: string) => void;
+  onResetPassword: (email: string) => Promise<void>;
 }
 
 export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswordPageProps) {
@@ -14,13 +14,15 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate password reset process
-    setTimeout(() => {
-      onResetPassword(email);
-      setIsLoading(false);
+    try {
+      await onResetPassword(email);
       setIsSubmitted(true);
-    }, 1000);
+    } catch (err: any) {
+      console.error('Reset password error', err);
+      alert((err && err.message) || 'Şifre sıfırlama gönderilemedi');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {
