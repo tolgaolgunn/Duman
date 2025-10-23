@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { createBrowserRouter, RouterProvider, useNavigate, useLocation } from 'react-router-dom';
 import { HomePage } from './pages/Home/HomePage';
 import { ProfilePage } from './pages/Profile/ProfilePage';
@@ -131,14 +132,26 @@ const LoginPageWrapper: React.FC = () => {
     console.log('Response status:', res.status);
 
     if (!res.ok) {
-      // Handle different error cases
+      // Read response text to show backend error details
+      const text = await res.text();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { data = { error: text }; }
+
+      // Map common status codes to friendly messages and show toast
       if (res.status === 404) {
-        throw new Error('API endpoint bulunamadı. Backend servisi çalışıyor mu?');
+        const msg = data?.error || 'API endpoint bulunamadı. Backend servisi çalışıyor mu?';
+        toast.error(msg);
+        throw new Error(msg);
       }
       if (res.status === 401) {
-        throw new Error('Kullanıcı adı veya şifre hatalı');
+        // Authentication failed (wrong email or password)
+        const serverMsg = data?.error || 'E-posta veya şifre hatalı';
+        toast.error(serverMsg);
+        throw new Error(serverMsg);
       }
-      throw new Error(`HTTP ${res.status}: Giriş başarısız`);
+      const otherMsg = data?.error || `HTTP ${res.status}: Giriş başarısız`;
+      toast.error(otherMsg);
+      throw new Error(otherMsg);
     }
 
     const data = await res.json();
@@ -151,6 +164,7 @@ const LoginPageWrapper: React.FC = () => {
     if (data.token) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('isAuthenticated', 'true');
+      toast.success('Giriş başarılı');
       navigate('/home');
     } else {
       throw new Error('Token alınamadı');
@@ -158,11 +172,13 @@ const LoginPageWrapper: React.FC = () => {
     
   } catch (err: any) {
     console.error('Login failed:', err);
-    
-    // More specific error messages
-    if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-      throw new Error('Sunucuya bağlanılamıyor. Backend servisi çalıştığınızdan emin olun.');
+    // Network error
+    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+      const msg = 'Sunucuya bağlanılamıyor. Backend servisi çalıştığınızdan emin olun.';
+      toast.error(msg);
+      throw new Error(msg);
     }
+    // If we already showed a toast above, rethrow so the UI also receives the error
     throw new Error(err?.message || 'Giriş sırasında beklenmeyen bir hata oluştu');
   }
 };

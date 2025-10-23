@@ -1,19 +1,26 @@
 import React, { useEffect, useState } from 'react';
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
 import { Home, User, MessageCircle, TrendingUp, Settings, LogOut, Sparkles } from 'lucide-react';
+import ImageModal from './ImageModal';
 import { currentUser } from '../lib/mockData';
 
 interface SidebarProps {
   currentPage: string;
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string) => void; 
   onLogout?: () => void;
   isOpen?: boolean;
   onToggle?: () => void;
 }
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onToggle }: SidebarProps) {
-  const [profile, setProfile] = useState<{ username?: string; email?: string; interests?: string[] }>({});
+  const [profile, setProfile] = useState<{ username?: string; email?: string; interests?: string[], avatar?: string, cover?: string }>({});
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem('authToken');
@@ -24,15 +31,41 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
             Authorization: `Bearer ${token}`
           }
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          setIsLoadingProfile(false);
+          return;
+        }
         const data = await res.json();
-        setProfile({ username: data.username, email: data.email, interests: data.interests || [] });
+  if (!mounted) return;
+  setProfile({ username: data.username, email: data.email, interests: data.interests || [], avatar: data.avatar || '', cover: data.cover || '' });
+  setIsLoadingProfile(false);
       } catch (err) {
         console.error('Sidebar fetch profile error', err);
       }
     };
 
     fetchProfile();
+
+    const handleProfileUpdated = (e: Event) => {
+      try {
+        const custom = e as CustomEvent;
+        const detail = custom.detail as { avatar?: string; cover?: string } | undefined;
+        if (detail && detail.avatar) {
+          setProfile(prev => ({ ...prev, avatar: detail.avatar }));
+        } else {
+          fetchProfile();
+        }
+      } catch (err) {
+        fetchProfile();
+      }
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdated as EventListener);
+
+    return () => {
+      mounted = false;
+      window.removeEventListener('profile-updated', handleProfileUpdated as EventListener);
+    };
   }, []);
 
   const menuItems = [
@@ -76,31 +109,56 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       {/* User Info */}
       {isOpen && (
         <div className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-              <span className="text-2xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-gray-900 truncate">@{profile.username || currentUser.username}</p>
-                {currentUser.isPremium && (
-                  <Sparkles className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-gray-100">
+                {isLoadingProfile ? (
+                  <Skeleton circle={true} height={48} width={48} />
+                ) : profile.avatar ? (
+                  <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover cursor-zoom-in" onClick={(e) => { e.stopPropagation(); setLightboxSrc(profile.avatar || null); }} />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    <span className="text-2xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
+                  </div>
                 )}
               </div>
-              <p className="text-gray-500 text-sm">{currentUser.followers.length} takipçi</p>
-            </div>
-          </div>  
-        </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  {isLoadingProfile ? (
+                    <Skeleton height={16} width={128} />
+                  ) : (
+                    <p className="text-gray-900 truncate">@{profile.username}</p>
+                  )}
+                  {currentUser.isPremium && (
+                    <Sparkles className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                  )}
+                </div>
+                {isLoadingProfile ? (
+                  <Skeleton height={12} width={80} className="mt-2" />
+                ) : (
+                  <p className="text-gray-500 text-sm">{currentUser.followers.length} takipçi</p>
+                )}
+              </div>
+            </div>  
+          </div>
       )}
       
       {/* Collapsed User Avatar */}
       {!isOpen && (
         <div className="p-4 border-b border-gray-100 flex justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
+          <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-gray-100">
+            {profile.avatar ? (
+              <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover cursor-zoom-in" onClick={(e) => { e.stopPropagation(); setLightboxSrc(profile.avatar || null); }} />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                <span className="text-2xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Lightbox */}
+      {lightboxSrc && <ImageModal src={lightboxSrc} alt="Avatar" onClose={() => setLightboxSrc(null)} />}
 
       {/* Navigation Menu */}
       <nav className="flex-1 p-3 overflow-y-auto">

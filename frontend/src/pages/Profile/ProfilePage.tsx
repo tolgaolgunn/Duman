@@ -1,22 +1,36 @@
 import React, { useEffect, useState } from 'react';
+import Skeleton from 'react-loading-skeleton';
+import 'react-loading-skeleton/dist/skeleton.css';
+import toast from 'react-hot-toast';
 import { Settings, Sparkles, X, Camera, User, Mail } from 'lucide-react';
 import { currentUser, mockPosts } from '../../lib/mockData';
+import ImageModal from '../../components/ImageModal';
 import { Post } from '../../components/Post';
 
 export function ProfilePage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<'posts' | 'liked'>('posts');
   const [showEditModal, setShowEditModal] = useState(false);
-  const [profile, setProfile] = useState({ username: currentUser.username, email: currentUser.email, interests: currentUser.interests });
-  const [editForm, setEditForm] = useState({
-    username: profile.username,
-    email: profile.email,
-    bio: '', // bio is not present on currentUser, initialize as empty string
-    interests: profile.interests
+  type ProfileShape = { username: string; email: string; interests: string[]; avatar?: string; cover?: string; bio?: string };
+
+  // start with an empty profile to avoid flashing the mock `currentUser` values
+  const [profile, setProfile] = useState<ProfileShape>({ username: '', email: '', interests: [], avatar: '', cover: '', bio: '' });
+  // edit form is initialized when opening the edit modal (avoid using mock data on first render)
+  const [editForm, setEditForm] = useState<{ username: string; email: string; bio: string; interests: string[] }>({
+    username: '',
+    email: '',
+    bio: '',
+    interests: []
   });
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [newInterest, setNewInterest] = useState('');
   const [showPhotoMenu, setShowPhotoMenu] = useState(false);
   const [showCoverMenu, setShowCoverMenu] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const userPosts = mockPosts.filter((post) => post.author.id === currentUser.id);
   const likedPostsData = mockPosts.slice(0, 3);
@@ -42,7 +56,7 @@ export function ProfilePage() {
     console.log('Current showEditModal:', showEditModal);
     setShowEditModal(true);
   // initialize edit form with latest profile
-  setEditForm({ username: profile.username, email: profile.email, bio: '', interests: profile.interests });
+  setEditForm({ username: profile.username, email: profile.email, bio: profile.bio || '', interests: profile.interests });
     console.log('setShowEditModal(true) called');
     
     // Test: setTimeout ile state'i kontrol et
@@ -55,8 +69,9 @@ export function ProfilePage() {
     // Fetch profile from backend using stored authToken
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('authToken');
-        if (!token) return;
+  const token = localStorage.getItem('authToken');
+  console.debug && console.debug('fetchProfile: token present?', !!token);
+  if (!token) { setIsLoadingProfile(false); return; }
         const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
         const res = await fetch(`${API_BASE}/api/auth/profile`, {
           headers: {
@@ -65,13 +80,17 @@ export function ProfilePage() {
         });
         if (!res.ok) {
           console.error('Failed to load profile', res.status);
+          setIsLoadingProfile(false);
           return;
         }
-        const data = await res.json();
-        setProfile({ username: data.username, email: data.email, interests: data.interests || [] });
-        setEditForm({ username: data.username, email: data.email, bio: '', interests: data.interests || [] });
+  const data = await res.json();
+  console.debug && console.debug('fetchProfile: response', data);
+  setProfile({ username: data.username, email: data.email, interests: data.interests || [], avatar: data.avatar || '', cover: data.cover || '', bio: data.bio || '' });
+  setEditForm({ username: data.username, email: data.email, bio: data.bio || '', interests: data.interests || [] });
+  setIsLoadingProfile(false);
       } catch (err) {
         console.error('Error fetching profile:', err);
+        setIsLoadingProfile(false);
       }
     };
 
@@ -79,9 +98,80 @@ export function ProfilePage() {
   }, []);
 
   const handleSaveProfile = () => {
-    // Burada gerçek uygulamada API çağrısı yapılır
-    console.log('Profile updated:', editForm);
-    setShowEditModal(false);
+    // helper to compare interests arrays
+    const normalizeInterests = (arr: string[] = []) => [...arr].map(i => i.trim()).filter(Boolean).sort();
+    const isSameInterests = (a: string[] = [], b: string[] = []) => {
+      const na = normalizeInterests(a);
+      const nb = normalizeInterests(b);
+      if (na.length !== nb.length) return false;
+      for (let i = 0; i < na.length; i++) if (na[i] !== nb[i]) return false;
+      return true;
+    };
+
+    const hasChanges = () => {
+      if (editForm.username !== profile.username) return true;
+      if (editForm.email !== profile.email) return true;
+      if ((editForm.bio || '') !== (profile.bio || '')) return true;
+      if (!isSameInterests(editForm.interests, profile.interests || [])) return true;
+      return false;
+    };
+
+    // If nothing changed, close modal and do nothing (no toast)
+    if (!hasChanges()) {
+      setShowEditModal(false);
+      return;
+    }
+
+    const save = async () => {
+      setIsSaving(true);
+      setSaveError(null);
+      try {
+        const token = localStorage.getItem('authToken');
+        console.debug && console.debug('handleSaveProfile: token present?', !!token, 'body:', { username: editForm.username, email: editForm.email, interests: editForm.interests, bio: editForm.bio });
+        if (!token) throw new Error('Kullanıcı oturumu bulunamadı');
+        const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+        const res = await fetch(`${API_BASE}/api/auth/profile`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            username: editForm.username,
+            email: editForm.email,
+            interests: editForm.interests,
+            bio: editForm.bio,
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          let data: any = {};
+          try { data = JSON.parse(text); } catch { data = { error: text }; }
+          throw new Error(data?.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.debug && console.debug('handleSaveProfile: response', data);
+        // Update local profile state with returned data (include avatar/cover/bio)
+        setProfile({ username: data.username, email: data.email, interests: data.interests || [], avatar: data.avatar || '', cover: data.cover || '', bio: data.bio || '' });
+        setEditForm({ username: data.username, email: data.email, bio: data.bio || '', interests: data.interests || [] });
+        // notify other components (Sidebar etc.) about profile change
+        try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { username: data.username, email: data.email, avatar: data.avatar, cover: data.cover, bio: data.bio } })); } catch (e) { /* ignore */ }
+        setShowEditModal(false);
+        // show success toast
+        try { toast.success('Profil güncellendi.'); } catch (e) { /* ignore */ }
+      } catch (err: any) {
+        console.error('Failed to save profile:', err);
+        const msg = err?.message || 'Profil kaydedilemedi';
+        setSaveError(msg);
+        try { toast.error(msg); } catch (e) { /* ignore */ }
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    save();
   };
 
   const handleCancelEdit = () => {
@@ -125,25 +215,99 @@ export function ProfilePage() {
   };
 
   const handleAddPhoto = () => {
-    // Dosya seçici oluştur
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        console.log('Yeni fotoğraf seçildi:', file.name);
-        // Burada gerçek uygulamada fotoğraf yükleme işlemi yapılır
-        alert(`Fotoğraf yüklendi: ${file.name}`);
+      if (!file) return;
+      try {
+        // Show preview
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+
+  await uploadFileWithProgress(file, 'avatar');
+  toast.success('Profil fotoğrafı yüklendi.');
+        // cleanup preview
+        setPreviewUrl(null);
+      } catch (err: any) {
+  console.error('Fotoğraf yükleme hatası', err);
+  toast.error('Fotoğraf yüklenemedi: ' + (err?.message || 'Bilinmeyen hata'));
       }
     };
     input.click();
   };
 
+  const uploadFileToServer = async (file: File, type: 'avatar' | 'cover') => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      toast.error('Lütfen önce giriş yapın');
+      return;
+    }
+
+    const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+    const form = new FormData();
+    form.append('file', file);
+    form.append('type', type);
+
+    // Use XHR to get progress events
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/api/auth/upload-photo`, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          setUploadProgress(percent);
+        }
+      };
+
+      xhr.onload = function () {
+        setUploadProgress(null);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+              setProfile((prev) => ({ ...prev, avatar: data.avatar || prev.avatar, cover: data.cover || prev.cover }));
+              // notify other components (e.g., Sidebar) about profile change
+              try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { avatar: data.avatar, cover: data.cover } })); } catch (e) { /* ignore */ }
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        } else {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            reject(new Error(data?.error || `HTTP ${xhr.status}`));
+          } catch (e) {
+            reject(new Error(`HTTP ${xhr.status}`));
+          }
+        }
+      };
+
+      xhr.onerror = function () {
+        setUploadProgress(null);
+        reject(new Error('Network error'));
+      };
+
+      xhr.send(form);
+    });
+  };
+
+  // Convenience that uses uploadFileToServer but provides progress state
+  const uploadFileWithProgress = async (file: File, type: 'avatar' | 'cover') => {
+    try {
+      setUploadProgress(0);
+      await uploadFileToServer(file, type);
+    } finally {
+      setUploadProgress(null);
+    }
+  };
+
   const handleEditPhoto = () => {
     console.log('Fotoğraf düzenleme moduna geçiliyor');
     // Burada gerçek uygulamada fotoğraf düzenleme arayüzü açılır
-    alert('Fotoğraf düzenleme özelliği yakında eklenecek!');
+  toast('Fotoğraf düzenleme özelliği yakında eklenecek!');
   };
 
   const handleRemovePhoto = () => {
@@ -151,7 +315,7 @@ export function ProfilePage() {
     if (confirmed) {
       console.log('Fotoğraf kaldırılıyor...');
       // Burada gerçek uygulamada fotoğraf silme işlemi yapılır
-      alert('Profil fotoğrafı kaldırıldı!');
+  toast('Profil fotoğrafı kaldırıldı!');
     }
   };
 
@@ -178,11 +342,18 @@ export function ProfilePage() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        console.log('Yeni cover fotoğrafı seçildi:', file.name);
-        alert(`Cover fotoğrafı yüklendi: ${file.name}`);
+      if (!file) return;
+      try {
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+  await uploadFileWithProgress(file, 'cover');
+  toast.success('Kapak fotoğrafı yüklendi.');
+        setPreviewUrl(null);
+      } catch (err: any) {
+  console.error('Kapak yükleme hatası', err);
+  toast.error('Kapak yüklenemedi: ' + (err?.message || 'Bilinmeyen hata'));
       }
     };
     input.click();
@@ -190,14 +361,14 @@ export function ProfilePage() {
 
   const handleEditCover = () => {
     console.log('Cover fotoğrafı düzenleme moduna geçiliyor');
-    alert('Cover fotoğrafı düzenleme özelliği yakında eklenecek!');
+  toast('Cover fotoğrafı düzenleme özelliği yakında eklenecek!');
   };
 
   const handleRemoveCover = () => {
     const confirmed = window.confirm('Cover fotoğrafınızı kaldırmak istediğinizden emin misiniz?');
     if (confirmed) {
       console.log('Cover fotoğrafı kaldırılıyor...');
-      alert('Cover fotoğrafı kaldırıldı!');
+  toast('Cover fotoğrafı kaldırıldı!');
     }
   };
 
@@ -205,14 +376,45 @@ export function ProfilePage() {
     <div className="max-w-2xl mx-auto">
       {/* Profile Header */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-6">
-        {/* Cover Image */}
-        <div className="h-32 bg-black" style={{backgroundColor: '#000000'}}></div>
+  {/* Cover Image */}
+  <div
+    className="h-32"
+    style={{
+      backgroundColor: '#000000',
+      backgroundImage: profile.cover ? `url('${profile.cover}')` : undefined,
+      backgroundSize: profile.cover ? 'contain' : undefined,
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+    }}
+    onClick={() => {
+      if (profile.cover) setLightboxSrc(profile.cover);
+    }}
+  ></div>
 
         {/* Profile Info */}
         <div className="px-6 pb-6" >
+          {isLoadingProfile ? (
+            <div className="flex items-end gap-4 -mt-12 mb-4">
+              <div className="w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden">
+                <Skeleton circle={true} height={96} width={96} />
+              </div>
+              <div className="flex-1 mt-14 space-y-2">
+                <Skeleton height={16} width={160} />
+                <Skeleton height={12} width={220} />
+                <Skeleton height={12} width={260} />
+              </div>
+              <div className="w-36 mt-14">
+                <Skeleton height={40} />
+              </div>
+            </div>
+          ) : (
           <div className="flex items-end gap-4 -mt-12 mb-4">
-            <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center border-4 border-white shadow-lg">
-              <span className="text-4xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
+            <div className="w-24 h-24 rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden bg-gradient-to-br from-blue-500 to-cyan-500">
+              {profile.avatar ? (
+                <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover cursor-zoom-in" onClick={() => setLightboxSrc(profile.avatar || null)} />
+              ) : (
+                <span className="text-4xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
+              )}
             </div>
             <div className="flex-1 mt-14">
               <div className="flex items-center gap-2 mb-1">
@@ -222,6 +424,9 @@ export function ProfilePage() {
                 )}
               </div>
               <p className="text-gray-500">{profile.email}</p>
+              {profile.bio && (
+                <p className="text-gray-700 mt-2">{profile.bio}</p>
+              )}
             </div>
             <button 
               onClick={(e) => {
@@ -239,6 +444,7 @@ export function ProfilePage() {
               <span>Profili Düzenle</span>
             </button>
           </div>
+          )}
 
           {/* Stats */}
           <div className="flex items-center gap-6 mb-4">
@@ -313,6 +519,11 @@ export function ProfilePage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Image lightbox/modal */}
+      {lightboxSrc && (
+        <ImageModal src={lightboxSrc} alt="Görüntü" onClose={() => setLightboxSrc(null)} />
       )}
       
       {activeTab === 'liked' && (
@@ -396,9 +607,25 @@ export function ProfilePage() {
             <div className="p-6 space-y-6">
               {/* Profile Picture */}
               <div className="flex flex-col items-center relative">
-                <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center border-4 border-white shadow-lg mb-4">
-                  <span className="text-4xl">{currentUser.avatar}</span>
-                </div>
+                <div className="w-24 h-24 rounded-full flex items-center justify-center border-4 border-white shadow-lg mb-4 overflow-hidden bg-gray-100">
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="preview" className="w-full h-full object-cover" />
+                    ) : profile.avatar ? (
+                      <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                        <span className="text-4xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
+                      </div>
+                    )}
+                  </div>
+                {uploadProgress !== null && (
+                  <div className="w-48 mt-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1 text-center">Yükleme: {uploadProgress}%</div>
+                  </div>
+                )}
                 <div className="relative">
                   <button 
                     onClick={(e) => {
@@ -408,7 +635,15 @@ export function ProfilePage() {
                     }}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
                   >
-                    <span className="text-lg">📷</span>
+                    <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-100">
+                      {previewUrl ? (
+                        <img src={previewUrl} alt="mini-preview" className="w-full h-full object-cover" />
+                      ) : profile.avatar ? (
+                        <img src={profile.avatar} alt="mini-avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm">📷</span>
+                      )}
+                    </div>
                     <span className="text-sm">Fotoğraf Değiştir</span>
                   </button>
                   
@@ -475,6 +710,7 @@ export function ProfilePage() {
                     type="text"
                     value={editForm.username}
                     onChange={(e) => setEditForm({...editForm, username: e.target.value})}
+                    disabled={isSaving}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Kullanıcı adınızı girin"
                   />
@@ -491,6 +727,7 @@ export function ProfilePage() {
                     type="email"
                     value={editForm.email}
                     onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                    disabled={isSaving}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="E-posta adresinizi girin"
                   />
@@ -505,6 +742,7 @@ export function ProfilePage() {
                 <textarea
                   value={editForm.bio}
                   onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
+                  disabled={isSaving}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   rows={3}
                   placeholder="Kendiniz hakkında kısa bir açıklama yazın..."
@@ -541,6 +779,7 @@ export function ProfilePage() {
                     type="text"
                     value={newInterest}
                     onChange={(e) => setNewInterest(e.target.value)}
+                    disabled={isSaving}
                     placeholder="Yeni ilgi alanı ekle..."
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     onKeyPress={(e) => {
@@ -566,16 +805,23 @@ export function ProfilePage() {
               <button
                 onClick={handleCancelEdit}
                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+                disabled={isSaving}
               >
                 İptal
               </button>
               <button
                 onClick={handleSaveProfile}
                 className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+                disabled={isSaving}
               >
-                Kaydet
+                {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
               </button>
             </div>
+            {saveError && (
+              <div className="p-4 text-sm text-red-600 border-t border-gray-100">
+                {saveError}
+              </div>
+            )}
           </div>
         </div>
       )}

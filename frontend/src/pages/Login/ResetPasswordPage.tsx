@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Lock, CheckCircle, ArrowLeft } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const ResetPasswordPage: React.FC = () => {
   const { token } = useParams() as { token?: string };
@@ -65,8 +66,7 @@ const ResetPasswordPage: React.FC = () => {
         return;
       }
 
-      // success
-      setMessage('Şifre başarıyla değiştirildi. Giriş sayfasına yönlendiriliyorsunuz...');
+      toast.success('Şifre başarıyla değiştirildi. Giriş sayfasına yönlendiriliyorsunuz...');
       setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
       console.error('Reset password error', err);

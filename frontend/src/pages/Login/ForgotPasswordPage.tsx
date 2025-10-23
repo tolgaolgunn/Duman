@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 
 interface ForgotPasswordPageProps {
@@ -17,9 +18,10 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
     try {
       await onResetPassword(email);
       setIsSubmitted(true);
+      toast.success('Şifre sıfırlama linki e-postaya gönderildi');
     } catch (err: any) {
-      console.error('Reset password error', err);
-      alert((err && err.message) || 'Şifre sıfırlama gönderilemedi');
+  console.error('Reset password error', err);
+  toast.error((err && err.message) || 'Şifre sıfırlama gönderilemedi');
     } finally {
       setIsLoading(false);
     }
@@ -49,6 +51,7 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
             <p className="text-gray-500 text-sm mb-6">
               E-postanızı kontrol edin ve bağlantıya tıklayarak yeni şifrenizi oluşturun.
             </p>
+            
             
             <div className="space-y-3">
               <button

@@ -5,11 +5,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import authRoute from './routes/authRoute.js';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const frontendPath = path.join(__dirname, '../frontend/build');
+const uploadsPath = path.join(__dirname, '..', process.env.UPLOAD_DIR || 'uploads');
 
 dotenv.config();
 
@@ -50,6 +52,19 @@ app.use(cors({
 }));
 // Routes
 app.use('/api/auth', authRoute);
+
+// Ensure uploads directory exists
+try {
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log('Created uploads directory at', uploadsPath);
+  }
+} catch (e) {
+  console.error('Failed to create uploads directory', e);
+}
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadsPath));
 
 app.use(express.static(frontendPath));
 app.use((req, res, next) => {
