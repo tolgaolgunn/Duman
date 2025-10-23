@@ -4,6 +4,9 @@ import User from "../models/userModel.js";
 
 export const login = async (req, res) => {
   
+  // Log incoming request body for debugging (will show identifier/email/username)
+  console.log('Incoming login request body:', req.body);
+
   const { email, username, password } = req.body;
   const identifier = email || username;
 

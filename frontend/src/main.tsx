@@ -2,6 +2,13 @@
   import { createRoot } from "react-dom/client";
   import App from "./App.tsx";
   import "./styles/index.css";
+  import { Toaster } from 'react-hot-toast';
 
-  createRoot(document.getElementById("root")!).render(<App />);
+  createRoot(document.getElementById("root")!).render(
+    <>
+      <App />
+      <Toaster position="top-center" 
+      reverseOrder={false}/>
+    </>
+  );
   

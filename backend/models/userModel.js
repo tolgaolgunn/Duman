@@ -23,9 +23,31 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: []
   }
+  ,
+  bio: {
+    type: String,
+    default: ''
+  },
+  avatar: {
+    type: String,
+    default: ''
+  },
+  cover: {
+    type: String,
+    default: ''
+  }
+  ,
+  avatarPublicId: {
+    type: String,
+    default: ''
+  },
+  coverPublicId: {
+    type: String,
+    default: ''
+  }
 }, { 
   timestamps: true 
 });
 
-// DÜZELTME: userModel yerine userSchema kullan
+userSchema.set('strict', false);
 export default mongoose.model('User', userSchema);
