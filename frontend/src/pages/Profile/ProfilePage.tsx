@@ -85,8 +85,10 @@ export function ProfilePage() {
         }
   const data = await res.json();
   console.debug && console.debug('fetchProfile: response', data);
-  setProfile({ username: data.username, email: data.email, interests: data.interests || [], avatar: data.avatar || '', cover: data.cover || '', bio: data.bio || '' });
-  setEditForm({ username: data.username, email: data.email, bio: data.bio || '', interests: data.interests || [] });
+  // Normalize backend response: some endpoints return { data: { ... } } while others return flat
+  const payload = data && data.data ? data.data : data;
+  setProfile({ username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', bio: payload.bio || '' });
+  setEditForm({ username: payload.username || '', email: payload.email || '', bio: payload.bio || '', interests: payload.interests || [] });
   setIsLoadingProfile(false);
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -151,13 +153,15 @@ export function ProfilePage() {
           throw new Error(data?.error || `HTTP ${res.status}`);
         }
 
-        const data = await res.json();
-        console.debug && console.debug('handleSaveProfile: response', data);
-        // Update local profile state with returned data (include avatar/cover/bio)
-        setProfile({ username: data.username, email: data.email, interests: data.interests || [], avatar: data.avatar || '', cover: data.cover || '', bio: data.bio || '' });
-        setEditForm({ username: data.username, email: data.email, bio: data.bio || '', interests: data.interests || [] });
-        // notify other components (Sidebar etc.) about profile change
-        try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { username: data.username, email: data.email, avatar: data.avatar, cover: data.cover, bio: data.bio } })); } catch (e) { /* ignore */ }
+  const data = await res.json();
+  console.debug && console.debug('handleSaveProfile: response', data);
+  // Normalize response shape
+  const payload = data && data.data ? data.data : data;
+  // Update local profile state with returned data (include avatar/cover/bio)
+  setProfile({ username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', bio: payload.bio || '' });
+  setEditForm({ username: payload.username || '', email: payload.email || '', bio: payload.bio || '', interests: payload.interests || [] });
+  // notify other components (Sidebar etc.) about profile change
+  try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { username: payload.username, email: payload.email, avatar: payload.avatar, cover: payload.cover, bio: payload.bio } })); } catch (e) { /* ignore */ }
         setShowEditModal(false);
         // show success toast
         try { toast.success('Profil güncellendi.'); } catch (e) { /* ignore */ }
@@ -268,9 +272,10 @@ export function ProfilePage() {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             const data = JSON.parse(xhr.responseText);
-              setProfile((prev) => ({ ...prev, avatar: data.avatar || prev.avatar, cover: data.cover || prev.cover }));
+            const payload = data && data.data ? data.data : data;
+              setProfile((prev) => ({ ...prev, avatar: payload.avatar || prev.avatar, cover: payload.cover || prev.cover }));
               // notify other components (e.g., Sidebar) about profile change
-              try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { avatar: data.avatar, cover: data.cover } })); } catch (e) { /* ignore */ }
+              try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { avatar: payload.avatar, cover: payload.cover } })); } catch (e) { /* ignore */ }
             resolve();
           } catch (e) {
             reject(e);

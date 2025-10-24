@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { resetMailService } from "../utils/resetMailService.js";
-import User from "../models/userModel.js";
-import PasswordReset from "../models/passwordReset.js"; 
+import { resetMailService } from "../../utils/resetMailService.js";
+import User from "../../models/userModel.js";
+import PasswordReset from "../../models/passwordReset.js"; 
 
 export const forgotPassword = async (req, res) => {
   const { email } = req.body;

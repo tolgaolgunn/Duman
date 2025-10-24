@@ -45,9 +45,20 @@ export function Post({ post, onLike, onComment, isLiked }: PostProps) {
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300 transition-all">
       {/* Post Header */}
       <div className="p-4 flex items-start gap-3">
-        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0">
-          <span className="text-2xl">{post.author.avatar}</span>
-        </div>
+        {/* Avatar: if it's a URL (uploaded image) show the image, otherwise show emoji/text */}
+        {post.author.avatar && (typeof post.author.avatar === 'string' && (post.author.avatar.startsWith('http') || post.author.avatar.startsWith('data:'))) ? (
+          <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0">
+            <ImageWithFallback
+              src={post.author.avatar}
+              alt={post.author.username || 'avatar'}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ) : (
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-2xl">{post.author.avatar}</span>
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-gray-900">@{post.author.username}</p>
@@ -77,14 +88,16 @@ export function Post({ post, onLike, onComment, isLiked }: PostProps) {
 
       {/* Post Image */}
       {post.imageUrl && (
-        <div className="px-4 pb-3">
-          <ImageWithFallback
-            src={post.imageUrl}
-            alt="Post image"
-            className="w-full rounded-xl object-cover max-h-96"
-          />
-        </div>
-      )}
+  <div className="px-4 pb-3">
+    <div className="w-full rounded-xl overflow-hidden border border-gray-100 bg-gray-50 flex justify-center">
+      <ImageWithFallback
+        src={post.imageUrl}
+        alt="Post image"
+        className="max-w-full max-h-96 object-scale-down"
+      />
+    </div>
+  </div>
+)}
 
       {/* Post Actions */}
       <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
