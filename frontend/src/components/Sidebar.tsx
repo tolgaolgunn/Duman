@@ -35,9 +35,10 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
           setIsLoadingProfile(false);
           return;
         }
-        const data = await res.json();
+    const data = await res.json();
   if (!mounted) return;
-  setProfile({ username: data.username, email: data.email, interests: data.interests || [], avatar: data.avatar || '', cover: data.cover || '' });
+  const payload = data && (data.data || data) ? (data.data || data) : data;
+  setProfile({ username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '' });
   setIsLoadingProfile(false);
       } catch (err) {
         console.error('Sidebar fetch profile error', err);
