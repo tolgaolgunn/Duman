@@ -11,6 +11,7 @@ import { register } from "../Controller/Auth/registerController.js";
 import { login } from "../Controller/Auth/loginController.js";
 import { getProfile, updateProfile } from "../Controller/Auth/profileController.js";
 import { uploadPhoto } from "../Controller/Auth/profileController.js";
+import { getUserById } from "../Controller/Auth/profileController.js";
 import { 
   forgotPassword, 
   verifyResetToken, 
@@ -58,6 +59,9 @@ router.post("/reset-password", resetPassword);
 router.get("/profile", authenticateToken, getProfile);
 router.put("/profile", authenticateToken, updateProfile);
 router.post('/upload-photo', authenticateToken, upload.single('file'), uploadPhoto);
+
+// Public: get user profile by id
+router.get('/user/:userId', getUserById);
 
 
 // Handle multer errors

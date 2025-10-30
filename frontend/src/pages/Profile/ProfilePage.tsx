@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import toast from 'react-hot-toast';
-import { Settings, Sparkles, X, Camera, User, Mail } from 'lucide-react';
-import { currentUser, mockPosts } from '../../lib/mockData';
+import { Settings, Sparkles, X, Camera, User, Mail, Image as ImageIcon } from 'lucide-react';
+import { currentUser, mockPosts, interestOptions } from '../../lib/mockData';
 import ImageModal from '../../components/ImageModal';
 import { Post } from '../../components/Post';
 
@@ -14,7 +15,7 @@ export function ProfilePage() {
   type ProfileShape = { username: string; email: string; interests: string[]; avatar?: string; cover?: string; bio?: string };
 
   // start with an empty profile to avoid flashing the mock `currentUser` values
-  const [profile, setProfile] = useState<ProfileShape>({ username: '', email: '', interests: [], avatar: '', cover: '', bio: '' });
+  const [profile, setProfile] = useState<ProfileShape & { id?: string }>({ username: '', email: '', interests: [], avatar: '', cover: '', bio: '' });
   // edit form is initialized when opening the edit modal (avoid using mock data on first render)
   const [editForm, setEditForm] = useState<{ username: string; email: string; bio: string; interests: string[] }>({
     username: '',
@@ -32,8 +33,50 @@ export function ProfilePage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  const userPosts = mockPosts.filter((post) => post.author.id === currentUser.id);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState<boolean>(true);
+
+  // If a route param is present we should show that user's profile (and posts)
+  const params = useParams();
+  const routeUserId = params?.userId as string | undefined;
+
+  // Parse JWT payload (client-side) to extract authenticated user's id (if any).
+  // We try common claim names: _id, id, sub, userId.
+  const parseJwtPayload = (token?: string | null) => {
+    if (!token) return null;
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      // base64url -> base64
+      let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      // Pad base64 string if necessary
+      while (base64.length % 4) base64 += '=';
+      const json = atob(base64);
+      return JSON.parse(json);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const authPayload = parseJwtPayload(localStorage.getItem('authToken'));
+  const authUserId = authPayload?.[_getProp(authPayload, ['_id','id','sub','userId'])];
+
+  // Helper to find the first existing property name from a list
+  function _getProp(obj: any, keys: string[]) {
+    for (const k of keys) if (obj && Object.prototype.hasOwnProperty.call(obj, k)) return k;
+    return keys[0];
+  }
+
+  // Determine owner: if no route param -> personal profile page (/profile). Show edit only if logged-in.
+  // If routeUserId exists, show edit only when it equals the authenticated user's id.
+  const isOwnProfile = routeUserId ? (Boolean(authUserId) && routeUserId === String(authUserId)) : Boolean(authUserId);
+
   const likedPostsData = mockPosts.slice(0, 3);
+
+  // userPosts will be provided by the server when available; otherwise fall back to mock data
+  const userPosts = posts.length > 0 ? posts : mockPosts.filter((post) => post.author.id === currentUser.id);
+
+  
 
   const handleLike = (postId: string) => {
     setLikedPosts((prev) => {
@@ -51,6 +94,130 @@ export function ProfilePage() {
     console.log('Comment on post:', postId);
   };
 
+  // Delete a post owned by the current user
+  const handleDeletePost = async (postId: string) => {
+    const confirmed = window.confirm('Bu gönderiyi silmek istediğinizden emin misiniz?');
+    if (!confirmed) return;
+    try {
+      const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        toast.error('Lütfen önce giriş yapın');
+        return;
+      }
+      const res = await fetch(`${API_BASE}/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await (res.headers.get('content-type')?.includes('application/json') ? res.json() : Promise.resolve({}));
+      if (!res.ok) {
+        const msg = data?.error || data?.message || `Silme başarısız: ${res.status}`;
+        toast.error(msg);
+        return;
+      }
+      // remove from local state
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      toast.success('Gönderi silindi');
+    } catch (err) {
+      console.error('Delete post failed', err);
+      toast.error('Gönderi silinirken hata oluştu');
+    }
+  };
+  // Edit flow: open modal, then save
+  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [showPostEditModal, setShowPostEditModal] = useState(false);
+  const [editPostForm, setEditPostForm] = useState<{ title?: string; content: string; tags?: string; image?: string | null }>(() => ({ title: '', content: '', tags: '', image: null }));
+  const [isSavingPostEdit, setIsSavingPostEdit] = useState(false);
+  const [editOptions, setEditOptions] = useState<string[]>(interestOptions);
+  const [editSelectedInterests, setEditSelectedInterests] = useState<string[]>([]);
+  const [editNewInterest, setEditNewInterest] = useState('');
+
+  const openEditPost = (post: any) => {
+    setEditingPost(post);
+    const existingTags = (post.tags || post.interests || []).map((t: string) => String(t).trim()).filter(Boolean);
+    setEditPostForm({ title: post.title || '', content: post.content || '', tags: existingTags.join(', '), image: post.imageUrl || null });
+    // Ensure editOptions contains any tags that are present on the post so chips can render
+    setEditOptions((prev) => {
+      const merged = Array.from(new Set([...(prev || []), ...existingTags]));
+      return merged;
+    });
+    setEditSelectedInterests(existingTags);
+    setShowPostEditModal(true);
+  };
+
+  // helper: convert File to data URL (base64)
+  const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+
+  const saveEditedPost = async () => {
+    if (!editingPost) return;
+    setIsSavingPostEdit(true);
+    try {
+      const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        toast.error('Lütfen önce giriş yapın');
+        return;
+      }
+
+      const body: any = { content: editPostForm.content };
+      if (editPostForm.title !== undefined) body.title = editPostForm.title;
+      // Prefer the chip-based selection (editSelectedInterests) if the user interacted with chips.
+      // If the user typed into the tags input, fallback to that value.
+      let tagsArray: string[] | undefined = undefined;
+      if (Array.isArray(editSelectedInterests) && editSelectedInterests.length > 0) {
+        tagsArray = editSelectedInterests.map((t) => String(t).trim()).filter(Boolean);
+      } else if (editPostForm.tags !== undefined) {
+        tagsArray = String(editPostForm.tags || '').split(',').map((t) => t.trim()).filter(Boolean);
+      }
+      if (tagsArray !== undefined) body.tags = tagsArray;
+      // Handle image: if user removed image explicitly (null) and there was an existing image, send empty string to remove;
+      // if user selected an image (data URL or url), send it; otherwise don't include image to keep unchanged.
+      if (editPostForm.image !== undefined) {
+        if (editPostForm.image === null) {
+          // user cleared image
+          body.image = '';
+        } else if (typeof editPostForm.image === 'string' && editPostForm.image.trim()) {
+          body.image = editPostForm.image;
+        }
+      }
+
+      const res = await fetch(`${API_BASE}/api/posts/${editingPost.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+
+      const data = await (res.headers.get('content-type')?.includes('application/json') ? res.json() : Promise.resolve({}));
+      if (!res.ok) {
+        const msg = data?.error || data?.message || `Güncelleme başarısız: ${res.status}`;
+        toast.error(msg);
+        return;
+      }
+      const payload = data && (data.data || data) ? (data.data || data) : data;
+
+      setPosts((prev) => prev.map((p) => p.id === editingPost.id ? {
+        ...p,
+        content: payload?.content || editPostForm.content,
+        title: payload?.title || editPostForm.title || p.title,
+        tags: payload?.tags || payload?.interests || (editPostForm.tags ? editPostForm.tags.split(',').map((t) => t.trim()).filter(Boolean) : p.tags)
+      } : p));
+
+      setShowPostEditModal(false);
+      setEditingPost(null);
+      toast.success('Gönderi güncellendi');
+    } catch (err) {
+      console.error('Update post failed', err);
+      toast.error('Gönderi güncellenirken hata oluştu');
+    } finally {
+      setIsSavingPostEdit(false);
+    }
+  };
+
   const handleEditProfile = () => {
     console.log('Edit profile button clicked');
     console.log('Current showEditModal:', showEditModal);
@@ -66,13 +233,52 @@ export function ProfilePage() {
   };
 
   useEffect(() => {
-    // Fetch profile from backend using stored authToken
+    // If route contains a userId, we should show that user's profile and posts.
+    // Otherwise fetch the logged-in user's profile as before.
     const fetchProfile = async () => {
       try {
-  const token = localStorage.getItem('authToken');
-  console.debug && console.debug('fetchProfile: token present?', !!token);
-  if (!token) { setIsLoadingProfile(false); return; }
         const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+        const token = localStorage.getItem('authToken');
+
+        if (routeUserId) {
+          // Viewing someone else's profile: fetch their public profile by id (to get interests/bio/cover)
+          setIsLoadingProfile(true);
+          try {
+            const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+            const res = await fetch(`${API_BASE}/api/auth/user/${routeUserId}`);
+            if (res.ok) {
+              const data = await res.json();
+              const payload = data && (data.data || data) ? (data.data || data) : data;
+              setProfile({ username: payload.username || `kullanıcı-${routeUserId.slice(-6)}`, email: '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', bio: payload.bio || '', id: routeUserId });
+            } else {
+              // fallback: still attempt to load posts and derive simple profile
+              const returned = await fetchPostsForUser(routeUserId);
+              if (returned && returned.length > 0) {
+                const first = returned[0];
+                setProfile({ username: first.author?.username || `kullanıcı-${routeUserId.slice(-6)}`, email: first.author?.email || '', interests: first.author?.interests || [], avatar: first.author?.avatar || '', cover: '', bio: '', id: routeUserId });
+              } else {
+                setProfile({ username: `kullanıcı-${routeUserId.slice(-6)}`, email: '', interests: [], avatar: '', cover: '', bio: '', id: routeUserId });
+              }
+            }
+          } catch (err) {
+            console.error('Failed to load public profile:', err);
+            const returned = await fetchPostsForUser(routeUserId);
+            if (returned && returned.length > 0) {
+              const first = returned[0];
+              setProfile({ username: first.author?.username || `kullanıcı-${routeUserId.slice(-6)}`, email: first.author?.email || '', interests: first.author?.interests || [], avatar: first.author?.avatar || '', cover: '', bio: '', id: routeUserId });
+            } else {
+              setProfile({ username: `kullanıcı-${routeUserId.slice(-6)}`, email: '', interests: [], avatar: '', cover: '', bio: '', id: routeUserId });
+            }
+          } finally {
+            setIsLoadingProfile(false);
+          }
+          // still fetch posts for the user
+          await fetchPostsForUser(routeUserId);
+          return;
+        }
+
+        // No route user id — show authenticated user's profile
+        if (!token) { setIsLoadingProfile(false); return; }
         const res = await fetch(`${API_BASE}/api/auth/profile`, {
           headers: {
             Authorization: `Bearer ${token}`
@@ -83,21 +289,149 @@ export function ProfilePage() {
           setIsLoadingProfile(false);
           return;
         }
-  const data = await res.json();
-  console.debug && console.debug('fetchProfile: response', data);
-  // Normalize backend response: some endpoints return { data: { ... } } while others return flat
-  const payload = data && data.data ? data.data : data;
-  setProfile({ username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', bio: payload.bio || '' });
-  setEditForm({ username: payload.username || '', email: payload.email || '', bio: payload.bio || '', interests: payload.interests || [] });
-  setIsLoadingProfile(false);
+        const data = await res.json();
+        console.debug && console.debug('fetchProfile: response', data);
+        const payload = data && data.data ? data.data : data;
+        const userObj = { username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', bio: payload.bio || '', id: payload._id || payload.id };
+        setProfile(userObj);
+        setEditForm({ username: payload.username || '', email: payload.email || '', bio: payload.bio || '', interests: payload.interests || [] });
+        setIsLoadingProfile(false);
+        // after profile loaded, fetch that user's posts
+        // If backend didn't return an id, use the authenticated "my-posts" endpoint instead of requiring an id
+        if (userObj.id) {
+          await fetchPostsForUser(userObj.id);
+        } else {
+          await fetchPostsForUser('me');
+        }
       } catch (err) {
         console.error('Error fetching profile:', err);
         setIsLoadingProfile(false);
       }
     };
 
-    fetchProfile();
-  }, []);
+  console.debug('ProfilePage mount: routeUserId=', routeUserId);
+  fetchProfile();
+    // If no route param (we're on /profile) try to fetch posts for the authenticated user early
+    // This handles the case where Sidebar navigation goes to /profile before Sidebar has resolved the user's id.
+    if (!routeUserId) {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        // kick off posts load immediately; fetchProfile will also attempt later but that's fine
+        fetchPostsForUser('me').catch((e) => console.debug('early fetchPostsForUser(me) failed', e));
+      } else {
+        // no token -> nothing to load
+        setIsLoadingPosts(false);
+      }
+    }
+  }, [routeUserId]);
+
+  // Fetch posts for profile user
+  const fetchPostsForUser = async (userId?: string) => {
+  if (!userId) {
+    console.debug('No userId provided, skipping posts fetch');
+    setIsLoadingPosts(false);
+    return [];
+  }
+  
+  setIsLoadingPosts(true);
+  try {
+    const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+    const token = localStorage.getItem('authToken');
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    let url;
+    if (userId === 'me') {
+      const token = localStorage.getItem('authToken');
+  if (token && profile.id) {
+    url = `${API_BASE}/api/posts/user/${encodeURIComponent(profile.id)}`;
+  } else {
+    url = `${API_BASE}/api/posts/my-posts`; // fallback
+  }
+    } else {
+      // Validate userId to prevent empty/invalid values
+      const safeId = String(userId).trim();
+      if (!safeId || safeId === 'me') {
+        url = `${API_BASE}/api/posts/my-posts`;
+      } else {
+        url = `${API_BASE}/api/posts/user/${encodeURIComponent(safeId)}`;
+      }
+    }
+
+    console.debug('Fetching posts from:', url);
+    const res = await fetch(url, { headers });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`Failed to load posts (${res.status}):`, errorText);
+      
+      // If it's a 400 error, try alternative approach
+      if (res.status === 400 && userId !== 'me') {
+        console.debug('400 error, trying my-posts endpoint instead');
+        const myPostsUrl = `${API_BASE}/api/posts/my-posts`;
+        const myPostsRes = await fetch(myPostsUrl, { headers });
+        
+        if (myPostsRes.ok) {
+          const data = await myPostsRes.json();
+          return processPostsData(data, profile);
+        }
+      }
+      
+      setPosts([]);
+      return [];
+    }
+
+    const data = await res.json();
+    return processPostsData(data, profile);
+    
+  } catch (err) {
+    console.error('Unable to load user posts:', err);
+    setPosts([]);
+    return [];
+  } finally {
+    setIsLoadingPosts(false);
+  }
+};
+
+// Helper function to process posts data
+const processPostsData = (data: any, profile: any) => {
+  const postsFromServer = data?.data || data || [];
+  const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+  const cloudinaryBase = ((import.meta as any).env?.VITE_CLOUDINARY_BASE as string) || 'https://res.cloudinary.com/dgjodxmkv/image/upload';
+
+  const toAbsolute = (url?: string) => {
+    if (!url) return undefined;
+    const trimmed = String(url).trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith('http') || trimmed.startsWith('data:') || trimmed.startsWith('//')) return trimmed;
+    if (trimmed.startsWith('/')) return API_BASE + trimmed;
+    return API_BASE + '/' + trimmed;
+  };
+
+  const mapped = postsFromServer.map((p: any) => ({
+    id: p._id || p.id,
+    author: {
+      id: p.author?._id || p.author?.id || profile.id,
+      username: p.author?.username || profile.username,
+      email: p.author?.email || profile.email,
+      interests: p.author?.interests || [],
+      followers: [],
+      following: [],
+      isPremium: false,
+      avatar: toAbsolute(p.author?.avatar) || toAbsolute(profile.avatar) || undefined
+    },
+    content: p.content,
+    imageUrl: toAbsolute(p.image) || toAbsolute(p.imageUrl) ||
+      (p.imagePublicId ? `${cloudinaryBase}/${p.imagePublicId}` : undefined),
+    tags: p.tags || p.interests || [],
+    likes: p.likes || [],
+    createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+    commentCount: p.commentCount || 0
+  }));
+  
+  setPosts(mapped);
+  return mapped;
+};
 
   const handleSaveProfile = () => {
     // helper to compare interests arrays
@@ -129,7 +463,6 @@ export function ProfilePage() {
       setSaveError(null);
       try {
         const token = localStorage.getItem('authToken');
-        console.debug && console.debug('handleSaveProfile: token present?', !!token, 'body:', { username: editForm.username, email: editForm.email, interests: editForm.interests, bio: editForm.bio });
         if (!token) throw new Error('Kullanıcı oturumu bulunamadı');
         const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
         const res = await fetch(`${API_BASE}/api/auth/profile`, {
@@ -146,24 +479,29 @@ export function ProfilePage() {
           }),
         });
 
+        const data = await (res.headers.get('content-type')?.includes('application/json') ? res.json() : Promise.resolve({}));
+
         if (!res.ok) {
-          const text = await res.text();
-          let data: any = {};
-          try { data = JSON.parse(text); } catch { data = { error: text }; }
-          throw new Error(data?.error || `HTTP ${res.status}`);
+          const msg = data?.error || data?.message || `HTTP ${res.status}`;
+          setSaveError(msg);
+          try { toast.error(msg); } catch (e) { /* ignore */ }
+          return;
         }
 
-  const data = await res.json();
-  console.debug && console.debug('handleSaveProfile: response', data);
-  // Normalize response shape
-  const payload = data && data.data ? data.data : data;
-  // Update local profile state with returned data (include avatar/cover/bio)
-  setProfile({ username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', bio: payload.bio || '' });
-  setEditForm({ username: payload.username || '', email: payload.email || '', bio: payload.bio || '', interests: payload.interests || [] });
-  // notify other components (Sidebar etc.) about profile change
-  try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: { username: payload.username, email: payload.email, avatar: payload.avatar, cover: payload.cover, bio: payload.bio } })); } catch (e) { /* ignore */ }
+        const payload = data && data.data ? data.data : data;
+        const updated = {
+          username: payload.username || editForm.username || profile.username,
+          email: payload.email || editForm.email || profile.email,
+          interests: payload.interests || editForm.interests || profile.interests || [],
+          avatar: payload.avatar || profile.avatar || '',
+          cover: payload.cover || profile.cover || '',
+          bio: payload.bio || editForm.bio || profile.bio || ''
+        };
+
+        setProfile(updated);
+        setEditForm({ username: updated.username, email: updated.email, bio: updated.bio || '', interests: updated.interests || [] });
+        try { window.dispatchEvent(new CustomEvent('profile-updated', { detail: updated })); } catch (e) { /* ignore */ }
         setShowEditModal(false);
-        // show success toast
         try { toast.success('Profil güncellendi.'); } catch (e) { /* ignore */ }
       } catch (err: any) {
         console.error('Failed to save profile:', err);
@@ -433,21 +771,20 @@ export function ProfilePage() {
                 <p className="text-gray-700 mt-2">{profile.bio}</p>
               )}
             </div>
+            {isOwnProfile && (
             <button 
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Button clicked!');
                 handleEditProfile();
               }}
-              onMouseDown={() => console.log('Mouse down on button')}
-              onMouseUp={() => console.log('Mouse up on button')}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all flex items-center gap-2 mt-14"
               style={{ cursor: 'pointer', zIndex: 10 }}
             >
               <Settings className="w-4 h-4" />
               <span>Profili Düzenle</span>
             </button>
+            )}
           </div>
           )}
 
@@ -495,7 +832,7 @@ export function ProfilePage() {
                 : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
-            Gönderiler ({userPosts.length})
+            Gönderiler ({isLoadingPosts ? '...' : userPosts.length})
           </button>
           <button
             onClick={() => setActiveTab('liked')}
@@ -513,22 +850,162 @@ export function ProfilePage() {
       {/* Content */}
       {activeTab === 'posts' && (
         <div className="space-y-4">
-          {userPosts.map((post) => (
-            <div key={post.id}>
-              <Post
-                post={post}
-                onLike={handleLike}
-                onComment={handleComment}
-                isLiked={likedPosts.has(post.id)}
-              />
-            </div>
-          ))}
+          {isLoadingPosts ? (
+            <div className="p-6 bg-white border border-gray-200 rounded-2xl">Yükleniyor...</div>
+          ) : (
+            userPosts.map((post) => (
+              <div key={post.id}>
+                <Post
+                  post={post}
+                  onLike={handleLike}
+                  onComment={handleComment}
+                  isLiked={likedPosts.has(post.id)}
+                  onEdit={isOwnProfile ? openEditPost : undefined}
+                  onDelete={isOwnProfile ? handleDeletePost : undefined}
+                />
+              </div>
+            ))
+          )}
         </div>
       )}
 
       {/* Image lightbox/modal */}
       {lightboxSrc && (
         <ImageModal src={lightboxSrc} alt="Görüntü" onClose={() => setLightboxSrc(null)} />
+      )}
+
+      {/* Post Edit Modal */}
+      {showPostEditModal && (
+        <div
+          onClick={() => { setShowPostEditModal(false); setEditingPost(null); }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: 12, width: '100%', maxWidth: 640, maxHeight: '90vh', overflow: 'auto' }}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold">Gönderiyi Düzenle</h3>
+              <button onClick={() => { setShowPostEditModal(false); setEditingPost(null); }} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-4 h-4 text-gray-600" /></button>
+            </div>
+            <div className="p-4">
+              <div className="flex gap-3 mb-3">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {profile?.avatar ? (
+                    <img src={profile.avatar} alt={profile.username || 'avatar'} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <span className="text-2xl">{currentUser.avatar}</span>
+                    </div>
+                  )}
+                </div>
+                <textarea
+                  value={editPostForm.content}
+                  onChange={(e) => setEditPostForm((s) => ({ ...s, content: e.target.value }))}
+                  placeholder="Ne düşünüyorsun?"
+                  className="flex-1 resize-none border-none focus:outline-none focus:ring-0 text-gray-800"
+                  rows={4}
+                />
+              </div>
+
+              {/* Image preview */}
+              {editPostForm.image && (
+                <div className="mt-3 relative overflow-hidden rounded-xl border border-gray-200 flex justify-center bg-gray-50">
+                  <img src={editPostForm.image} alt="preview" className="max-w-full max-h-96 object-scale-down" />
+                  <button
+                    onClick={() => setEditPostForm((s) => ({ ...s, image: null }))}
+                    className="absolute top-1 right-1 bg-red-500 text-black rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors text-xs font-bold z-10 shadow-lg"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+                <div className="flex-1">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {editOptions.map((opt) => {
+                      const active = editSelectedInterests.includes(opt);
+                      return (
+                        <button
+                          key={opt}
+                          onClick={() => {
+                            setEditSelectedInterests((prev) => prev.includes(opt) ? prev.filter((i) => i !== opt) : [...prev, opt]);
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-sm transition-all ${active ? 'bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          type="button"
+                        >
+                          #{opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Yeni ilgi alanı ekle..."
+                      value={editNewInterest}
+                      onChange={(e) => setEditNewInterest(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = (editNewInterest || '').trim();
+                        if (!val) return toast.error('Lütfen bir ilgi alanı yazın');
+                        const exists = editOptions.some(o => o.toLowerCase() === val.toLowerCase());
+                        if (exists) {
+                          if (!editSelectedInterests.includes(val)) setEditSelectedInterests((p) => [...p, val]);
+                          setEditNewInterest('');
+                          return;
+                        }
+                        setEditOptions((prev) => [...prev, val]);
+                        setEditSelectedInterests((p) => [...p, val]);
+                        setEditNewInterest('');
+                      }}
+                      className="px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      Ekle
+                    </button>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-all cursor-pointer">
+                  <ImageIcon className="w-5 h-5" />
+                  <span className="text-sm">Resim Ekle</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const f = (e.target as HTMLInputElement).files?.[0];
+                      if (!f) return;
+                      if (f.size > 5 * 1024 * 1024) { toast.error("Resim 5MB'den büyük olamaz"); return; }
+                      try {
+                        const dataUrl = await fileToDataUrl(f);
+                        setEditPostForm((s) => ({ ...s, image: dataUrl }));
+                      } catch (err) {
+                        console.error('File to data URL failed', err);
+                        toast.error('Resim okunamadı');
+                      }
+                    }}
+                    className="hidden"
+                    style={{ display: 'none' }}
+                  />
+                </label>
+
+                <button
+                  onClick={saveEditedPost}
+                  disabled={isSavingPostEdit}
+                  className="ml-auto px-6 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+                >
+                  {isSavingPostEdit ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-3 p-4 border-t border-gray-100">
+              <button onClick={() => { setShowPostEditModal(false); setEditingPost(null); }} className="flex-1 px-4 py-2 bg-gray-100 rounded-lg">İptal</button>
+              <button onClick={saveEditedPost} disabled={isSavingPostEdit} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg">{isSavingPostEdit ? 'Kaydediliyor...' : 'Kaydet'}</button>
+            </div>
+          </div>
+        </div>
       )}
       
       {activeTab === 'liked' && (

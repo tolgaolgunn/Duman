@@ -14,7 +14,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onToggle }: SidebarProps) {
-  const [profile, setProfile] = useState<{ username?: string; email?: string; interests?: string[], avatar?: string, cover?: string }>({});
+  const [profile, setProfile] = useState<{ id?: string; username?: string; email?: string; interests?: string[], avatar?: string, cover?: string }>({});
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
@@ -37,8 +37,22 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
         }
     const data = await res.json();
   if (!mounted) return;
-  const payload = data && (data.data || data) ? (data.data || data) : data;
-  setProfile({ username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '' });
+    const payload = data && (data.data || data) ? (data.data || data) : data;
+    // include id so Sidebar can link to /profile/:userId
+    let resolvedId = payload._id || payload.id;
+    // Fallback: try decode JWT payload to extract userId/id if backend didn't return id
+    if (!resolvedId) {
+      try {
+        const raw = token.split('.')[1];
+        if (raw) {
+          const decoded = JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')));
+          resolvedId = decoded?.userId || decoded?.id || decoded?._id;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    setProfile({ id: resolvedId, username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '' });
   setIsLoadingProfile(false);
       } catch (err) {
         console.error('Sidebar fetch profile error', err);
@@ -77,6 +91,25 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
     { id: 'settings', label: 'Ayarlar', icon: Settings },
   ];
 
+  // helper to resolve profile path (use id if available, else try to decode token at click-time)
+  const resolveProfilePath = () => {
+    if (profile?.id) return `profile/${profile.id}`;
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      try {
+        const raw = token.split('.')[1];
+        if (raw) {
+          const decoded = JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')));
+          const resolved = decoded?.userId || decoded?.id || decoded?._id;
+          if (resolved) return `profile/${resolved}`;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return 'profile';
+  };
+
   return (
     <div className={`fixed left-0 top-0 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 z-50 ${
       isOpen ? 'w-64' : 'w-16'
@@ -109,7 +142,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
 
       {/* User Info */}
       {isOpen && (
-        <div className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
+        <div className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate(resolveProfilePath())}>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-gray-100">
                 {isLoadingProfile ? (
@@ -145,7 +178,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       
       {/* Collapsed User Avatar */}
       {!isOpen && (
-        <div className="p-4 border-b border-gray-100 flex justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate('profile')}>
+        <div className="p-4 border-b border-gray-100 flex justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate(resolveProfilePath())}>
           <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-gray-100">
             {profile.avatar ? (
               <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover cursor-zoom-in" onClick={(e) => { e.stopPropagation(); setLightboxSrc(profile.avatar || null); }} />
