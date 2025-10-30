@@ -270,6 +270,15 @@ const router = createBrowserRouter([
     ),
   },
   {
+    // Allow visiting another user's profile by id: /profile/:userId
+    path: '/profile/:userId',
+    element: (
+      <AuthWrapper>
+        <ProfilePage />
+      </AuthWrapper>
+    ),
+  },
+  {
     path: '/chat',
     element: (
       <AuthWrapper>

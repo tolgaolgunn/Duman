@@ -358,3 +358,30 @@ export const uploadPhoto = async (req, res) => {
     });
   }
 };
+
+
+export const getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, error: 'Invalid user id' });
+    }
+
+    const user = await User.findById(userId).select('username interests avatar cover bio createdAt updatedAt');
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    return res.status(200).json({
+      username: user.username,
+      interests: user.interests || [],
+      avatar: user.avatar,
+      cover: user.cover,
+      bio: user.bio,
+      id: user._id
+    });
+  } catch (error) {
+    console.error('Get user by id error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};

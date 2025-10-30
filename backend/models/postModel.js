@@ -1,11 +1,9 @@
 import mongoose from "mongoose";
 const postSchema = new mongoose.Schema({
     title: {
-         type: String,
-        required: [true, 'Title is required'],
-        trim: true,
-        minlength: [3, 'Title must be at least 3 characters'],
-        maxlength: [200, 'Title cannot exceed 200 characters']
+        type: String,
+        required: false,
+        trim: true
     },
     content: {
         type: String,
