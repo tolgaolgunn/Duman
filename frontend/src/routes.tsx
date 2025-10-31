@@ -5,6 +5,8 @@ import { HomePage } from './pages/Home/HomePage';
 import { ProfilePage } from './pages/Profile/ProfilePage';
 import { ChatRoom } from './pages/Chat/ChatRoom';
 import { TrendingPage } from './pages/Trending/TrendingPage';
+import { TrendingPostsPage } from './pages/Trending/TrendingPostsPage';
+import { PostDetailPage } from './pages/Post/PostDetailPage';
 import { SettingsPage } from './pages/Settings/SettingsPage';
 import { LoginPage } from './pages/Login/LoginPage';
 import RegisterPage from './pages/Register/RegisterPage';
@@ -291,6 +293,22 @@ const router = createBrowserRouter([
     element: (
       <AuthWrapper>
         <TrendingPage />
+      </AuthWrapper>
+    ),
+  },
+  {
+    path: '/trending/trendingposts/:topic?',
+    element: (
+      <AuthWrapper>
+        <TrendingPostsPage />
+      </AuthWrapper>
+    ),
+  },
+  {
+    path: '/post/:postId',
+    element: (
+      <AuthWrapper>
+        <PostDetailPage />
       </AuthWrapper>
     ),
   },

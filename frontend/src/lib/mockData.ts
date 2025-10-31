@@ -157,11 +157,129 @@ export const mockPosts: Post[] = [
     likes: Array.from({ length: 678 }, (_, i) => `user_${i}`),
     createdAt: new Date(Date.now() - 14 * 60 * 60 * 1000),
     commentCount: 19
+  },
+  {
+    id: "8",
+    author: mockUsers[0],
+    content: "Machine Learning'de yeni bir breakthrough! Transformer mimarisi artık her yerde 🚀",
+    tags: ["teknoloji", "yapay zeka"],
+    likes: Array.from({ length: 2156 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 16 * 60 * 60 * 1000),
+    commentCount: 89
+  },
+  {
+    id: "9",
+    author: mockUsers[4],
+    content: "Yapay zeka ile oyun geliştirme artık çok daha kolay. NPC'ler gerçekten zeki! 🎮🤖",
+    tags: ["oyun", "yapay zeka", "teknoloji"],
+    likes: Array.from({ length: 1456 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000),
+    commentCount: 56
+  },
+  {
+    id: "10",
+    author: mockUsers[0],
+    content: "ChatGPT'nin yeni özellikleri gerçekten etkileyici. Artık kod yazmada bile yardımcı oluyor 💻",
+    tags: ["yapay zeka", "yazılım", "teknoloji"],
+    likes: Array.from({ length: 3234 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 20 * 60 * 60 * 1000),
+    commentCount: 134
+  },
+  {
+    id: "11",
+    author: mockUsers[2],
+    content: "Fenerbahçe'nin yeni transferleri harika! Bu sezon çok güçlü olacağız 💪⚽",
+    tags: ["spor", "futbol"],
+    likes: Array.from({ length: 2891 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 22 * 60 * 60 * 1000),
+    commentCount: 201
+  },
+  {
+    id: "12",
+    author: mockUsers[3],
+    content: "Türk müziğinde yeni bir dönem başlıyor! Genç müzisyenler harika işler çıkarıyor 🎵",
+    tags: ["müzik"],
+    likes: Array.from({ length: 1234 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    commentCount: 45
+  },
+  {
+    id: "13",
+    author: mockUsers[4],
+    content: "Valorant Champions Tour başlıyor! Türk takımları bu sezon şampiyonluğa oynuyor 🏆",
+    tags: ["oyun", "e-spor"],
+    likes: Array.from({ length: 1876 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000),
+    commentCount: 78
+  },
+  {
+    id: "14",
+    author: mockUsers[1],
+    content: "UI/UX tasarımında yeni trendler: Glassmorphism ve Neumorphism birleşiyor! 🎨",
+    tags: ["tasarım"],
+    likes: Array.from({ length: 987 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 28 * 60 * 60 * 1000),
+    commentCount: 32
+  },
+  {
+    id: "15",
+    author: mockUsers[0],
+    content: "Python 3.13 çıktı! Performans iyileştirmeleri gerçekten etkileyici 🐍",
+    tags: ["yazılım", "teknoloji"],
+    likes: Array.from({ length: 2456 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000),
+    commentCount: 112
+  },
+  {
+    id: "16",
+    author: mockUsers[0],
+    content: "Neural networks'ün yeni mimarileri: Attention mekanizmaları her şeyi değiştirdi 🧠",
+    tags: ["yapay zeka", "teknoloji"],
+    likes: Array.from({ length: 1890 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 32 * 60 * 60 * 1000),
+    commentCount: 67
+  },
+  {
+    id: "17",
+    author: mockUsers[4],
+    content: "Web3 oyunları geleceği şekillendiriyor. Play-to-earn modelleri artık mainstream! 🎮💰",
+    tags: ["oyun", "teknoloji"],
+    likes: Array.from({ length: 1678 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 34 * 60 * 60 * 1000),
+    commentCount: 94
+  },
+  {
+    id: "18",
+    author: mockUsers[2],
+    content: "Beşiktaş'ta yeni teknik direktör ataması! Bu sezon farklı olacak 🔴⚫",
+    tags: ["spor", "futbol"],
+    likes: Array.from({ length: 2134 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 36 * 60 * 60 * 1000),
+    commentCount: 156
+  },
+  {
+    id: "19",
+    author: mockUsers[3],
+    content: "Yerli müzik endüstrisi büyüyor! Streaming platformları Türk sanatçılara daha fazla fırsat veriyor 🎤",
+    tags: ["müzik"],
+    likes: Array.from({ length: 890 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 38 * 60 * 60 * 1000),
+    commentCount: 28
+  },
+  {
+    id: "20",
+    author: mockUsers[1],
+    content: "Figma'nın yeni özellikleri tasarımcıların işini kolaylaştırıyor. AI ile otomatik tasarım! 🎨✨",
+    tags: ["tasarım", "teknoloji"],
+    likes: Array.from({ length: 1456 }, (_, i) => `user_${i}`),
+    createdAt: new Date(Date.now() - 40 * 60 * 60 * 1000),
+    commentCount: 71
   }
 ];
 
 // Mock comments
 export const mockComments: Comment[] = [
+  // Post 1 comments (Yapay Zeka)
   {
     id: "1",
     postId: "1",
@@ -178,10 +296,129 @@ export const mockComments: Comment[] = [
   },
   {
     id: "3",
+    postId: "1",
+    author: mockUsers[2],
+    text: "Bir sonraki seviye ne olacak acaba? 🤔",
+    createdAt: new Date(Date.now() - 45 * 60 * 1000)
+  },
+  // Post 2 comments (Sanat)
+  {
+    id: "4",
     postId: "2",
     author: mockUsers[0],
     text: "Harika görünüyor! Ben de gitmek istiyorum.",
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000)
+  },
+  {
+    id: "5",
+    postId: "2",
+    author: mockUsers[3],
+    text: "Sanat ve teknolojinin buluşması gerçekten etkileyici 🎨",
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000)
+  },
+  // Post 3 comments (Spor)
+  {
+    id: "6",
+    postId: "3",
+    author: mockUsers[0],
+    text: "Ben de 2-1 Galatasaray diyorum! 🔥",
+    createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000)
+  },
+  {
+    id: "7",
+    postId: "3",
+    author: mockUsers[1],
+    text: "Fenerbahçe bu sezon çok güçlü, zor maç olacak",
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000)
+  },
+  {
+    id: "8",
+    postId: "3",
+    author: mockUsers[4],
+    text: "Derbi günü heyecanı başladı bile! ⚽",
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000)
+  },
+  // Post 4 comments (Müzik)
+  {
+    id: "9",
+    postId: "4",
+    author: mockUsers[1],
+    text: "Çok güzel olmuş! Linki paylaşır mısın? 🎸",
+    createdAt: new Date(Date.now() - 7 * 60 * 60 * 1000)
+  },
+  {
+    id: "10",
+    postId: "4",
+    author: mockUsers[2],
+    text: "Mor ve Ötesi harika bir grup!",
+    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000)
+  },
+  // Post 5 comments (Oyun)
+  {
+    id: "11",
+    postId: "5",
+    author: mockUsers[0],
+    text: "ADC main olarak bu haberi çok sevdim! 🎮",
+    createdAt: new Date(Date.now() - 9 * 60 * 60 * 1000)
+  },
+  {
+    id: "12",
+    postId: "5",
+    author: mockUsers[3],
+    text: "Support main olarak ne diyorsun? 😄",
+    createdAt: new Date(Date.now() - 8 * 60 * 60 * 1000)
+  },
+  // Post 6 comments (React)
+  {
+    id: "13",
+    postId: "6",
+    author: mockUsers[1],
+    text: "React 19 gerçekten game changer olacak! 🚀",
+    createdAt: new Date(Date.now() - 11 * 60 * 60 * 1000)
+  },
+  {
+    id: "14",
+    postId: "6",
+    author: mockUsers[4],
+    text: "Server Components ile neler yapabiliriz acaba?",
+    createdAt: new Date(Date.now() - 10 * 60 * 60 * 1000)
+  },
+  // Post 8 comments (ML)
+  {
+    id: "15",
+    postId: "8",
+    author: mockUsers[1],
+    text: "Transformer mimarisi gerçekten devrim yarattı!",
+    createdAt: new Date(Date.now() - 15 * 60 * 60 * 1000)
+  },
+  {
+    id: "16",
+    postId: "8",
+    author: mockUsers[3],
+    text: "Attention mechanism'ları öğrenmek istiyorum 🤖",
+    createdAt: new Date(Date.now() - 14 * 60 * 60 * 1000)
+  },
+  // Post 10 comments (ChatGPT)
+  {
+    id: "17",
+    postId: "10",
+    author: mockUsers[2],
+    text: "ChatGPT gerçekten hayatımı kolaylaştırdı!",
+    createdAt: new Date(Date.now() - 19 * 60 * 60 * 1000)
+  },
+  {
+    id: "18",
+    postId: "10",
+    author: mockUsers[1],
+    text: "Kod yazarken çok yardımcı oluyor gerçekten 💻",
+    createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000)
+  },
+  {
+    id: "19",
+    postId: "10",
+    author: mockUsers[4],
+    text: "Ama dikkatli kullanmak lazım, her zaman doğru değil 😅",
+    createdAt: new Date(Date.now() - 17 * 60 * 60 * 1000)
   }
 ];
 
@@ -209,6 +446,36 @@ export const trendingTopics = [
     topic: "Dijital Sanat",
     postCount: 98,
     summary: "NFT pazarında durgunluk devam ederken, AI ile üretilen sanat eserleri tartışmalara yol açıyor."
+  },
+  {
+    topic: "Teknoloji",
+    postCount: 312,
+    summary: "Yeni teknolojiler ve inovasyonlar hakkında güncel tartışmalar. Yapay zeka, blockchain ve gelecek teknolojileri gündemde."
+  },
+  {
+    topic: "Spor",
+    postCount: 267,
+    summary: "Futbol, basketbol ve diğer spor dallarında son gelişmeler. Transfer haberleri ve maç sonuçları."
+  },
+  {
+    topic: "Müzik",
+    postCount: 145,
+    summary: "Yeni albümler, konserler ve müzik dünyasındaki son gelişmeler. Sanatçılar ve etkinlikler."
+  },
+  {
+    topic: "Oyun",
+    postCount: 223,
+    summary: "Video oyunları, e-spor ve oyun endüstrisindeki son haberler. Yeni çıkan oyunlar ve turnuvalar."
+  },
+  {
+    topic: "Tasarım",
+    postCount: 178,
+    summary: "Grafik tasarım, web tasarım ve yaratıcı endüstrilerdeki trendler. Tasarım araçları ve teknikleri."
+  },
+  {
+    topic: "Yazılım",
+    postCount: 201,
+    summary: "Yazılım geliştirme, programlama dilleri ve teknolojiler. Geliştiriciler için ipuçları ve kaynaklar."
   }
 ];
 
