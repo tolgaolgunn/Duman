@@ -6,8 +6,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Cloudinary configuration
+// Cloudinary configuration - lazy initialization
+let cloudinaryConfigured = false;
+
 const configureCloudinary = () => {
+  if (cloudinaryConfigured) {
+    return; // Already configured
+  }
+
   const requiredConfigs = [
     'CLOUD_NAME',
     'CLOUD_API_KEY',
@@ -25,9 +31,9 @@ const configureCloudinary = () => {
     api_key: process.env.CLOUD_API_KEY,
     api_secret: process.env.CLOUD_API_SECRET,
   });
-};
 
-configureCloudinary();
+  cloudinaryConfigured = true;
+};
 
 /**
  * Get user profile
@@ -218,6 +224,9 @@ export const updateProfile = async (req, res) => {
  */
 export const uploadPhoto = async (req, res) => {
   try {
+    // Configure Cloudinary only when needed
+    configureCloudinary();
+
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ 
         success: false,
