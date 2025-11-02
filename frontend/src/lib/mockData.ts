@@ -2,11 +2,18 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  phone?: string;
   interests: string[];
   followers: string[];
   following: string[];
   isPremium: boolean;
+  premiumPlan?: 'normal' | 'student';
+  premiumCreatedAt?: Date;
   avatar?: string;
+  isVerified?: boolean;
+  createdAt?: Date;
+  gender?: 'male' | 'female' | 'other';
+  birthDate?: Date;
 }
 
 export interface Post {
@@ -423,7 +430,16 @@ export const mockComments: Comment[] = [
 ];
 
 // Current user (logged in user)
-export const currentUser: User = mockUsers[0];
+export const currentUser: User = {
+  ...mockUsers[0],
+  phone: '+90 555 123 4567',
+  isVerified: true,
+  createdAt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000), // 1 yıl önce
+  gender: 'male',
+  birthDate: new Date(1995, 5, 15), // 15 Haziran 1995
+  premiumPlan: 'normal',
+  premiumCreatedAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // 90 gün önce
+};
 
 // Trending topics for AI assistant
 export const trendingTopics = [
