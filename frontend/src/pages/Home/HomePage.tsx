@@ -128,7 +128,8 @@ export function HomePage() {
           tags: p.tags || p.interests || [],
           likes: p.likes || [],
           createdAt: new Date(p.createdAt),
-          commentCount: p.commentCount || 0
+          // Prefer an explicit commentCount, otherwise fall back to comments array length if present
+          commentCount: (typeof p.commentCount === 'number') ? p.commentCount : (Array.isArray(p.comments) ? p.comments.length : 0)
         }));
         setPosts(mapped);
       } catch (err) {
@@ -314,7 +315,7 @@ export function HomePage() {
               onClick={async () => {
                 // handle share
                 if (!newPostContent.trim() && !imagePreview) return toast.error('Lütfen içerik veya resim ekleyin');
-                const token = localStorage.getItem('authToken');
+                const token = localStorage.getItem('token') || localStorage.getItem('authToken');
                 if (!token) return toast.error('Lütfen önce giriş yapın');
 
                 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';

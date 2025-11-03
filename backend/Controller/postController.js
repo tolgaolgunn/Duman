@@ -309,3 +309,111 @@ export const getPostById = async (req, res) => {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 };
+
+export const createComment = async (req, res) => {
+  try {
+    const postId = req.params.postId || req.params.id;
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({ success: false, error: 'Invalid or missing postId' });
+    }
+
+    const userId = req.userId || req.user?.userId;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    const { content } = req.body || {};
+    if (!content || !String(content).trim()) {
+      return res.status(400).json({ success: false, error: 'Comment content is required' });
+    }
+
+    // Find the post first
+    const post = await postModel.findById(postId);
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    // Create comment object
+    const commentObj = {
+      _id: new mongoose.Types.ObjectId(),
+      author: new mongoose.Types.ObjectId(userId),
+      content: String(content).trim(),
+      createdAt: new Date()
+    };
+
+    // Add comment to post
+    post.comments.push(commentObj);
+    await post.save();
+
+    // Populate the author info for the newly created comment
+    await post.populate('comments.author', 'username avatar');
+
+    // Find the specific comment we just added
+    const createdComment = post.comments.id(commentObj._id);
+    
+    if (!createdComment) {
+      return res.status(500).json({ success: false, error: 'Failed to create comment' });
+    }
+
+    // Format the response properly
+    const responseComment = {
+      id: createdComment._id,
+      author: {
+        id: createdComment.author._id,
+        username: createdComment.author.username,
+        avatar: createdComment.author.avatar
+      },
+      content: createdComment.content,
+      createdAt: createdComment.createdAt
+    };
+
+    return res.status(201).json({ 
+      success: true, 
+      data: responseComment,
+      message: 'Comment added successfully'
+    });
+
+  } catch (error) {
+    console.error('Create comment error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};
+export const getComments = async (req, res) => {
+  try {
+    const postId = req.params.postId || req.params.id;
+    if (!postId || !mongoose.Types.ObjectId.isValid(postId)) {
+      return res.status(400).json({ success: false, error: 'Invalid or missing postId' });
+    }
+
+    const post = await postModel.findById(postId).populate('comments.author', 'username avatar');
+    if (!post) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    // Normalize comments shape for frontend - sort by newest first
+    const comments = (post.comments || [])
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(c => ({
+        id: c._id,
+        author: c.author ? { 
+          id: c.author._id, 
+          username: c.author.username, 
+          avatar: c.author.avatar 
+        } : { 
+          id: undefined, 
+          username: 'Unknown',
+          avatar: undefined
+        },
+        content: c.content,
+        createdAt: c.createdAt
+      }));
+
+    return res.status(200).json({ 
+      success: true, 
+      data: comments 
+    });
+  } catch (error) {
+    console.error('Get comments error:', error);
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+};

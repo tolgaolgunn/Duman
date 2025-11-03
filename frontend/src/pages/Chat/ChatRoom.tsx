@@ -27,6 +27,7 @@ interface Room {
   memberCount: number;
   isPrivate: boolean;
   isPremium: boolean;
+  icon?: string;
   isParticipant?: boolean;
   lastMessage?: string;
   unreadCount?: number;
@@ -145,6 +146,7 @@ export function ChatRoom() {
         const room: Room = {
           id: created._id || created.id,
           name: created.name,
+          icon: created.icon || created.icon || '💬',
           description: created.description || '',
           memberCount: created.memberCount || created.participants?.length || 1,
           isPrivate: created.roomSettings?.isPrivate || created.isPrivate || false,
@@ -264,6 +266,7 @@ export function ChatRoom() {
       const list = data?.data || data || [];
       const mapped: Room[] = list.map((r: any) => ({
         id: r._id || r.id,
+        icon: r.icon || '💬',
         name: r.name,
         description: r.description,
         memberCount: r.memberCount || r.participants?.length || 0,
@@ -385,6 +388,7 @@ export function ChatRoom() {
         const r = roomData || {};
         const mapped: Room = {
           id: r._id || r.id,
+          icon: r.icon || '💬',
           name: r.name,
           description: r.description || '',
           memberCount: r.memberCount || r.participants?.length || 0,
@@ -528,7 +532,7 @@ export function ChatRoom() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <Hash size={16} className="text-neutral-500" />
+                      <span className="text-lg">{room.icon || '💬'}</span>
                       <span>{room.name}</span>
                       {room.isPrivate && <Lock size={14} className="text-neutral-500" />}
                       {!room.isPrivate && <Globe size={14} className="text-neutral-500" />}
@@ -557,7 +561,7 @@ export function ChatRoom() {
             <div className="p-4 border-b border-neutral-200 flex items-center justify-between bg-white">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <Hash size={20} className="text-neutral-600" />
+                  <span className="text-2xl">{selectedRoom.icon || '💬'}</span>
                   <h2 className="text-xl">{selectedRoom.name}</h2>
                   {selectedRoom.isPrivate && <Lock size={16} className="text-neutral-500" />}
                   <Badge variant="outline" className="rounded-lg border border-yellow-500 hover:bg-neutral-100 text-yellow-500">

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, Share2, Sparkles } from 'lucide-react';
 import { Post as PostType } from '../lib/mockData';
+import { Send } from 'lucide-react';
 import { ImageWithFallback } from './ImageWithFallback';
 
 interface PostProps {
@@ -41,8 +42,38 @@ function getTimeAgo(date: Date): string {
 
 export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: PostProps) {
   const navigate = useNavigate();
+  const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
   const [showComments, setShowComments] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [comments, setComments] = useState<Array<{ id: string; author: { id?: string; username: string; avatar?: string }; content: string; createdAt: string }>>([]);
+  const [newComment, setNewComment] = useState('');
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState<number>(
+    // Prefer explicit commentCount if present, otherwise fall back to comments array length if provided by the API
+    (post as any)?.commentCount ?? (Array.isArray((post as any)?.comments) ? (post as any).comments.length : 0)
+  );
+  const [previewComments, setPreviewComments] = useState<Array<{ id: string; author: { id?: string; username: string; avatar?: string }; content: string; createdAt: string }>>([]);
+  const commentInputRef = useRef<HTMLInputElement | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id?: string; username?: string; avatar?: string } | null>(null);
+
+  const decodeJwt = (token?: string | null) => {
+    if (!token) return null;
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return null;
+      let b = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b.length % 4) b += '=';
+      return JSON.parse(atob(b));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const currentUserAvatar = useMemo(() => {
+    if (!currentUser) return null;
+    return currentUser.avatar || (currentUser.username ? currentUser.username.charAt(0).toUpperCase() : null);
+  }, [currentUser]);
   const likeCount = post.likes.length;
   const likeEmoji = getLikeEmoji(likeCount);
 
@@ -141,6 +172,32 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
   </div>
 )}
 
+      {/* Inline preview comments (1-2 most recent) */}
+      {previewComments.length > 0 && (
+        <div className="px-4 pb-3 border-t border-gray-100 bg-white">
+          <div className="space-y-3">
+            {previewComments.map((c) => (
+              <div key={c.id} className="flex gap-3">
+                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0" style={{ background: 'linear-gradient(135deg,#6b7280,#374151)' }}>
+                  {typeof c.author.avatar === 'string' && (c.author.avatar.startsWith('http') || c.author.avatar.startsWith('data:')) ? (
+                    <ImageWithFallback src={c.author.avatar} alt={c.author.username || 'avatar'} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-sm">{c.author.avatar || (c.author.username ? c.author.username.charAt(0).toUpperCase() : '�')}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-gray-900 break-words text-sm">@{c.author.username}</p>
+                  <p className="text-gray-700 text-sm mt-1 break-words whitespace-pre-wrap">{c.content}</p>
+                </div>
+              </div>
+            ))}
+            <button onClick={() => { setShowComments(true); commentInputRef.current?.focus(); }} className="text-sm text-gray-500 hover:underline">Tüm {localCommentCount} yorumu göster</button>
+          </div>
+        </div>
+      )}
+
       {/* Post Actions */}
       <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
         <button
@@ -163,7 +220,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
           className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-50 text-gray-700 transition-all"
         >
           <MessageCircle className="w-5 h-5" />
-          <span>{post.commentCount}</span>
+          <span>{localCommentCount}</span>
         </button>
 
         <div className="ml-auto flex items-center gap-2">
@@ -177,28 +234,227 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
       {showComments && (
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
           <div className="flex gap-3 mb-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-sm">{post.author.avatar}</span>
+            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0" style={{ background: 'linear-gradient(135deg,#3b82f6,#06b6d4)' }}>
+              {currentUserAvatar ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-sm">{currentUserAvatar}</span>
+                </div>
+              ) : (
+                // If the post author's avatar is a URL, show the image; otherwise show the raw avatar text/letter
+                typeof post.author.avatar === 'string' && (post.author.avatar.startsWith('http') || post.author.avatar.startsWith('data:')) ? (
+                  <ImageWithFallback src={post.author.avatar} alt={post.author.username || 'avatar'} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-sm">{post.author.avatar}</span>
+                  </div>
+                )
+              )}
             </div>
             <input
+              ref={commentInputRef}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (!newComment.trim()) return;
+                  await submitComment();
+                }
+              }}
               type="text"
               placeholder="Yorumunuzu yazın..."
               className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600 focus:border-transparent"
+              disabled={submittingComment}
             />
+            <button
+              onClick={async () => { if (newComment.trim()) await submitComment(); commentInputRef.current?.focus(); }}
+              disabled={submittingComment || !newComment.trim()}
+              aria-label="Yorumu gönder"
+              className="ml-2 p-2 rounded-full bg-blue-600 text-white disabled:opacity-60 flex items-center justify-center"
+            >
+              <Send size={16} />
+            </button>
           </div>
+
           <div className="space-y-3">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-sm">👩‍🎨</span>
-              </div>
-              <div className="flex-1">
-                <p className="text-gray-900">@zeynep_kaya</p>
-                <p className="text-gray-700 text-sm mt-1">Harika bir paylaşım! 👏</p>
-              </div>
-            </div>
+              {commentsLoading ? (
+              <div className="text-sm text-gray-500">Yükleniyor...</div>
+            ) : comments.length === 0 ? (
+              <div className="text-sm text-gray-500">Henüz yorum yok. İlk yorumu siz yazın!</div>
+            ) : (
+              comments.map((c) => (
+                <div key={c.id} className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0" style={{ background: 'linear-gradient(135deg,#6b7280,#374151)' }}>
+                    {typeof c.author.avatar === 'string' && (c.author.avatar.startsWith('http') || c.author.avatar.startsWith('data:')) ? (
+                      <ImageWithFallback src={c.author.avatar} alt={c.author.username || 'avatar'} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-sm">{c.author.avatar || (c.author.username ? c.author.username.charAt(0).toUpperCase() : '�')}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-gray-900 break-words">@{c.author.username}</p>
+                    <p className="text-gray-700 text-sm mt-1 break-words whitespace-pre-wrap">{c.content}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
     </div>
   );
+
+  async function fetchComments() {
+  setCommentsLoading(true);
+  try {
+    // Support both storage keys used in the app: some flows write 'token',
+    // others write 'authToken'. Check both so requests include the JWT.
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+  const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, { headers });
+    
+    if (!res.ok) {
+      throw new Error(`Yorumlar alınamadı: ${res.status}`);
+    }
+    
+    const text = await res.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    console.debug('fetchComments response for post', post.id, res.status, parsed);
+
+    // Normalize possible shapes: { success:true, data: [...] } OR [...] OR { data: [...] }
+    let list: any[] = [];
+    if (Array.isArray(parsed)) list = parsed;
+    else if (parsed && Array.isArray(parsed.data)) list = parsed.data;
+    else if (parsed && Array.isArray(parsed.comments)) list = parsed.comments;
+
+    if (list.length) {
+      setComments(list);
+      setLocalCommentCount(list.length);
+  setPreviewComments(list.slice(0, 5));
+    } else {
+      // If the comments endpoint returned nothing, try fetching the post itself
+      // (some server responses include comments on the post object)
+      try {
+  const postRes = await fetch(`${API_BASE}/api/posts/${post.id}`);
+        if (postRes.ok) {
+          const postText = await postRes.text();
+          let postParsed: any = null;
+          try { postParsed = JSON.parse(postText); } catch { postParsed = postText; }
+          const maybeComments = Array.isArray(postParsed?.data?.comments)
+            ? postParsed.data.comments
+            : (Array.isArray(postParsed?.comments) ? postParsed.comments : []);
+          if (maybeComments && maybeComments.length) {
+            setComments(maybeComments);
+            setLocalCommentCount(maybeComments.length);
+            setPreviewComments(maybeComments.slice(0, 5));
+            return;
+          }
+        }
+      } catch (e) {
+        console.debug('fetchComments fallback post fetch failed', e);
+      }
+
+      setComments([]);
+      setPreviewComments([]);
+      // If server returned something unexpected, keep comments empty but log for debugging
+      if (res.ok && !list.length) console.debug('fetchComments: no comments found in response', parsed);
+    }
+  } catch (err) {
+    console.error('Yorumları yükleme hatası:', err);
+    setComments([]);
+  } finally {
+    setCommentsLoading(false);
+  }
 }
+
+  async function submitComment() {
+  if (!newComment.trim()) return;
+  setSubmittingComment(true);
+  try {
+    // Support both storage keys used in the app
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+  const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ content: newComment.trim() }),
+    });
+    
+    if (!res.ok) throw new Error('Yorum gönderilemedi');
+    
+    const responseData = await res.json();
+    
+    // Extract the comment from the response data
+    const createdComment = responseData.data; // This is the key fix
+    
+    if (createdComment) {
+      // Prepend new comment to list
+      setComments((s) => [createdComment, ...s]);
+      setLocalCommentCount((c) => c + 1);
+      // also update preview (keep most recent two)
+  setPreviewComments((p) => [createdComment, ...p].slice(0, 5));
+      setNewComment('');
+    } else {
+      throw new Error('Yorum oluşturulamadı');
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setSubmittingComment(false);
+  }
+}
+
+
+  useEffect(() => {
+    if (showComments) {
+      fetchComments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showComments]);
+
+  // Fetch a small preview of comments (1-2) for feed view so users see recent replies
+  useEffect(() => {
+    let mounted = true;
+    const fetchPreview = async () => {
+      if (!post || (localCommentCount || 0) <= 0) return;
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, { headers });
+        if (!res.ok) return;
+        const dataText = await res.text().catch(() => null);
+        let data: any = null;
+        if (typeof dataText === 'string') {
+          try { data = JSON.parse(dataText); } catch { data = dataText; }
+        } else {
+          data = dataText;
+        }
+        const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : (Array.isArray(data?.comments) ? data.comments : []));
+        if (mounted) setPreviewComments(list.slice(0, 5));
+      } catch (e) {
+        // ignore preview errors
+        console.debug('fetchPreview error', e);
+      }
+    };
+
+    // Only fetch preview when comments are present and preview is empty
+    if (previewComments.length === 0 && (localCommentCount || 0) > 0) {
+      fetchPreview();
+    }
+
+    return () => { mounted = false; };
+  }, [localCommentCount, post?.id]);
+}
+
