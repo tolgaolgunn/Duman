@@ -66,7 +66,7 @@ app.use((err, req, res, next) => {
 // Routes
 app.use('/api/auth', authRoute);
 app.use('/api/posts', postRoute);
-app.use('/api/chat', chatRoute); // Yeni chat route'u
+app.use('/api/chat', chatRoute);
 
 // Ensure uploads directory exists
 try {

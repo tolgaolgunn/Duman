@@ -6,7 +6,9 @@ import {
   getPostById,
   updatePost,
   deletePost,
-  getUserPosts 
+  getUserPosts ,
+  createComment,
+  getComments
 } from '../Controller/postController.js';
 import { 
   authenticateToken, 
@@ -36,5 +38,11 @@ router.put('/:postId', authenticateToken, requirePostOwner, updatePost);
 
 // Post silme - sadece post sahibi
 router.delete('/:postId', authenticateToken, requirePostOwner, deletePost);
+
+// Yorum oluşturma
+router.post('/:postId/comments', authenticateToken, createComment);
+
+// Bir postun yorumlarını getirme
+router.get('/:postId/comments', optionalAuthenticate, getComments);
 
 export default router;

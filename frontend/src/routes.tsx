@@ -162,9 +162,9 @@ const LoginPageWrapper: React.FC = () => {
       throw new Error(data.error);
     }
 
-    // Save token and mark authenticated
+    // Save token and mark authenticated (standardized key: 'token')
     if (data.token) {
-      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('token', data.token);
       localStorage.setItem('isAuthenticated', 'true');
       toast.success('Giriş başarılı');
       navigate('/home');
