@@ -173,7 +173,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
 )}
 
       {/* Inline preview comments (1-2 most recent) */}
-      {previewComments.length > 0 && (
+      {previewComments.length > 0 && !showComments && (
         <div className="px-4 pb-3 border-t border-gray-100 bg-white">
           <div className="space-y-3">
             {previewComments.map((c) => (
@@ -193,7 +193,16 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
                 </div>
               </div>
             ))}
-            <button onClick={() => { setShowComments(true); commentInputRef.current?.focus(); }} className="text-sm text-gray-500 hover:underline">Tüm {localCommentCount} yorumu göster</button>
+            <button
+              onClick={() => {
+                setShowComments(true);
+                // focus after render
+                setTimeout(() => commentInputRef.current?.focus(), 0);
+              }}
+              className="text-sm text-gray-500 hover:underline"
+            >
+              Tüm {localCommentCount} yorumu göster
+            </button>
           </div>
         </div>
       )}
@@ -270,7 +279,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
               onClick={async () => { if (newComment.trim()) await submitComment(); commentInputRef.current?.focus(); }}
               disabled={submittingComment || !newComment.trim()}
               aria-label="Yorumu gönder"
-              className="ml-2 p-2 rounded-full bg-blue-600 text-white disabled:opacity-60 flex items-center justify-center"
+              className="ml-2 p-2 rounded-full bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               <Send size={16} />
             </button>
@@ -384,6 +393,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
     // Support both storage keys used in the app
     const token = localStorage.getItem('token') || localStorage.getItem('authToken');
   const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -427,7 +437,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
   useEffect(() => {
     let mounted = true;
     const fetchPreview = async () => {
-      if (!post || (localCommentCount || 0) <= 0) return;
+      if (!post) return;
       try {
         const token = localStorage.getItem('token') || localStorage.getItem('authToken');
         const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -449,8 +459,8 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
       }
     };
 
-    // Only fetch preview when comments are present and preview is empty
-    if (previewComments.length === 0 && (localCommentCount || 0) > 0) {
+    // Fetch preview once when preview is empty (works after refresh even if count not provided)
+    if (previewComments.length === 0) {
       fetchPreview();
     }
 

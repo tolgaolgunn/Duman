@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface LoginPageProps {
@@ -11,6 +11,7 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -21,12 +22,32 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
 
     try {
       await onLogin(username, password);
+      if (rememberMe) {
+        localStorage.setItem('rememberedUsername', username);
+        localStorage.setItem('rememberedPassword', password);
+        localStorage.setItem('rememberMe', 'true');
+      } else {
+        localStorage.removeItem('rememberedUsername');
+        localStorage.removeItem('rememberedPassword');
+        localStorage.removeItem('rememberMe');
+      }
     } catch (err: any) {
       setError(err?.message || 'Giriş başarısız');
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const savedRemember = localStorage.getItem('rememberMe') === 'true';
+    if (savedRemember) {
+      const savedUsername = localStorage.getItem('rememberedUsername') || '';
+      const savedPassword = localStorage.getItem('rememberedPassword') || '';
+      setUsername(savedUsername);
+      setPassword(savedPassword);
+      setRememberMe(true);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -72,13 +93,8 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
                   placeholder="Şifrenizi girin"
                   required
                 />
-                {/* Show Password Button */}
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" /> }
                 </button>
                 
               </div>
@@ -88,6 +104,8 @@ export function LoginPage({ onNavigate, onLogin }: LoginPageProps) {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 text-gray-600 bg-gray-50 border-gray-300 rounded focus:ring-gray-600 focus:ring-2"
                 />
                 <span className="ml-2 text-gray-600 text-sm">Beni hatırla</span>

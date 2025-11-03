@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Lock, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Lock, CheckCircle, ArrowLeft, Eye, EyeOff, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const ResetPasswordPage: React.FC = () => {
@@ -12,6 +12,16 @@ const ResetPasswordPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const passwordRequirements = [
+    { text: 'En az 6 karakter', isValid: newPassword.length >= 6 },
+    { text: 'Büyük harf içermeli', isValid: /[A-Z]/.test(newPassword) },
+    { text: 'Küçük harf içermeli', isValid: /[a-z]/.test(newPassword) },
+    { text: 'Rakam içermeli', isValid: /\d/.test(newPassword) },
+    { text: 'Özel karakter içermeli (!@#$%^&*)', isValid: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword) },
+  ];
 
   useEffect(() => {
     const verify = async () => {
@@ -109,18 +119,69 @@ const ResetPasswordPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm text-gray-700 mb-1">Yeni Şifre</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="Yeni şifre" required />
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600"
+                  placeholder="Yeni şifrenizi giriniz"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {newPassword && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xxs font-medium text-gray-700 mb-2">Şifre Gereksinimleri:</p>
+                  <ul className="space-y-1">
+                    {passwordRequirements.map((requirement, index) => (
+                      <li key={index} className="flex items-center gap-2 text-xs">
+                        {requirement.isValid ? (
+                          <Check className="w-3 h-3 text-green-600 flex-shrink-0" />
+                        ) : (
+                          <X className="w-3 h-3 text-red-500 flex-shrink-0" />
+                        )}
+                        <span className={requirement.isValid ? 'text-green-600' : 'text-red-500'}>
+                          {requirement.text}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Yeni Şifre (Tekrar)</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 border rounded-xl" placeholder="Yeni şifre (tekrar)" required />
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-600"
+                  placeholder="Yeni şifrenizi tekrar giriniz"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             {message && <div className="text-sm text-center text-red-600">{message}</div>}
 
             <div className="flex gap-2">
               <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 bg-gray-100 rounded-xl">{isLoading ? 'Gönderiliyor...' : 'Şifreyi Değiştir'}</button>
-              <button type="button" onClick={() => navigate('/login')} className="px-4 py-3 bg-white border rounded-xl">Girişe Dön</button>
+              <button type="button" onClick={() => navigate('/login')} className="px-4 py-3 bg-gray-100 rounded-xl">Girişe Dön</button>
             </div>
           </form>
         </div>

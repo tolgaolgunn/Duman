@@ -3,8 +3,7 @@ import { useParams } from 'react-router-dom';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import toast from 'react-hot-toast';
-import { Settings, Sparkles, X, Camera, User, Mail, Image as ImageIcon } from 'lucide-react';
-import { currentUser, mockPosts, interestOptions } from '../../lib/mockData';
+import { Settings, X, Image as ImageIcon } from 'lucide-react';
 import ImageModal from '../../components/ImageModal';
 import { Post } from '../../components/Post';
 
@@ -71,10 +70,10 @@ export function ProfilePage() {
   // If routeUserId exists, show edit only when it equals the authenticated user's id.
   const isOwnProfile = routeUserId ? (Boolean(authUserId) && routeUserId === String(authUserId)) : Boolean(authUserId);
 
-  const likedPostsData = mockPosts.slice(0, 3);
+  const likedPostsData: any[] = [];
 
-  // userPosts will be provided by the server when available; otherwise fall back to mock data
-  const userPosts = posts.length > 0 ? posts : mockPosts.filter((post) => post.author.id === currentUser.id);
+  // userPosts will be provided by the server when available
+  const userPosts = posts;
 
   
 
@@ -128,7 +127,7 @@ export function ProfilePage() {
   const [showPostEditModal, setShowPostEditModal] = useState(false);
   const [editPostForm, setEditPostForm] = useState<{ title?: string; content: string; tags?: string; image?: string | null }>(() => ({ title: '', content: '', tags: '', image: null }));
   const [isSavingPostEdit, setIsSavingPostEdit] = useState(false);
-  const [editOptions, setEditOptions] = useState<string[]>(interestOptions);
+  const [editOptions, setEditOptions] = useState<string[]>([]);
   const [editSelectedInterests, setEditSelectedInterests] = useState<string[]>([]);
   const [editNewInterest, setEditNewInterest] = useState('');
 
@@ -518,10 +517,10 @@ const processPostsData = (data: any, profile: any) => {
 
   const handleCancelEdit = () => {
     setEditForm({
-      username: currentUser.username,
-      email: currentUser.email,
-      bio: '', // bio property doesn't exist on currentUser, so keep as empty string
-      interests: currentUser.interests
+      username: profile.username,
+      email: profile.email,
+      bio: profile.bio || '',
+      interests: profile.interests || []
     });
     setNewInterest('');
     setShowEditModal(false);
@@ -762,9 +761,6 @@ const processPostsData = (data: any, profile: any) => {
             <div className="flex-1 mt-14">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-gray-900">@{profile.username}</h2>
-                {currentUser.isPremium && (
-                  <Sparkles className="w-5 h-5 text-yellow-500" />
-                )}
               </div>
               <p className="text-gray-500">{profile.email}</p>
               {profile.bio && (
@@ -795,11 +791,11 @@ const processPostsData = (data: any, profile: any) => {
               <p className="text-gray-500 text-sm">Gönderi</p>
             </div>
             <div>
-              <p className="text-gray-900">{currentUser.followers.length}</p>
+              <p className="text-gray-900">0</p>
               <p className="text-gray-500 text-sm">Takipçi</p>
             </div>
             <div>
-              <p className="text-gray-900">{currentUser.following.length}</p>
+              <p className="text-gray-900">0</p>
               <p className="text-gray-500 text-sm">Takip</p>
             </div>
           </div>
@@ -892,7 +888,7 @@ const processPostsData = (data: any, profile: any) => {
                     <img src={profile.avatar} alt={profile.username || 'avatar'} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                      <span className="text-2xl">{currentUser.avatar}</span>
+                      <span className="text-2xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
                     </div>
                   )}
                 </div>
@@ -1010,26 +1006,13 @@ const processPostsData = (data: any, profile: any) => {
       
       {activeTab === 'liked' && (
         <div className="space-y-4">
-          {likedPostsData.length > 0 ? (
-            likedPostsData.map((post) => (
-              <div key={post.id}>
-                <Post
-                  post={post}
-                  onLike={handleLike}
-                  onComment={handleComment}
-                  isLiked={likedPosts.has(post.id)}
-                />
-              </div>
-            ))
-          ) : (
-            <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">❤️</span>
-              </div>
-              <p className="text-gray-500 mb-2">Henüz beğendiğiniz gönderi yok</p>
-              <p className="text-gray-400 text-sm">Beğendiğiniz gönderiler burada görünecek</p>
+          <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">❤️</span>
             </div>
-          )}
+            <p className="text-gray-500 mb-2">Henüz beğendiğiniz gönderi yok</p>
+            <p className="text-gray-400 text-sm">Beğendiğiniz gönderiler burada görünecek</p>
+          </div>
         </div>
       )}
       
@@ -1096,7 +1079,7 @@ const processPostsData = (data: any, profile: any) => {
                       <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                        <span className="text-4xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || currentUser.avatar}</span>
+                        <span className="text-4xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
                       </div>
                     )}
                   </div>
