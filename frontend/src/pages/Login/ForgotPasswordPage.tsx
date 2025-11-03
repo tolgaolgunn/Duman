@@ -135,7 +135,7 @@ export function ForgotPasswordPage({ onNavigate, onResetPassword }: ForgotPasswo
                 required
               />
             </div>
-
+            
             <button
               type="submit"
               disabled={isLoading}

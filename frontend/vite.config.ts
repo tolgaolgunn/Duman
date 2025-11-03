@@ -54,14 +54,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: true,
-    // Proxy API requests to the backend server (running on port 3000 by default)
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    strictPort: true,
+    open: true, 
   },
 });
