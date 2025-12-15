@@ -577,10 +577,8 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
         </div>
       )}
 
-      {/* Inline Preview Yorumlar */}
-      {/* KRİTİK DÜZELTME: Tam yorum paneli (showComments) kapalıysa göster.
-         Ayrıca önizleme için sadece 1 yorum alındığı için previewComments.length >= 1 kontrolü yeterli. */}
-      {previewComments.length >= 1 && !showComments && (
+      {/* Inline preview comments (1-2 most recent) */}
+      {previewComments.length > 0 && (
         <div className="px-4 pb-3 border-t border-gray-100 bg-white">
           <div className="space-y-3">
             {previewComments.map((c) => (
@@ -603,19 +601,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
                 </div>
               </div>
             ))}
-
-            {/* Sadece gösterilmeyen yorum varsa (yani localCommentCount > 1 ise) butonu göster */}
-            {localCommentCount > previewComments.length && (
-              <button
-                onClick={() => {
-                  setShowComments(true);
-                  setTimeout(() => commentInputRef.current?.focus(), 0);
-                }}
-                className="text-sm text-gray-500 hover:underline"
-              >
-                Tüm {localCommentCount} yorumu göster
-              </button>
-            )}
+            <button onClick={() => { setShowComments(true); commentInputRef.current?.focus(); }} className="text-sm text-gray-500 hover:underline">Tüm {localCommentCount} yorumu göster</button>
           </div>
         </div>
       )}
@@ -692,7 +678,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
               onClick={async () => { await submitComment(); commentInputRef.current?.focus(); }}
               disabled={submittingComment || !newComment.trim() || !hasAuthToken}
               aria-label="Yorumu gönder"
-              className="ml-2 p-2 rounded-full bg-blue-600 text-white disabled:opacity-60 flex items-center justify-center"
+              className="ml-2 p-2 rounded-full bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               <Send size={16} />
             </button>
@@ -799,4 +785,156 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
       )}
     </div>
   );
+
+  async function fetchComments() {
+    setCommentsLoading(true);
+    try {
+      // Support both storage keys used in the app: some flows write 'token',
+      // others write 'authToken'. Check both so requests include the JWT.
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, { headers });
+
+      if (!res.ok) {
+        throw new Error(`Yorumlar alınamadı: ${res.status}`);
+      }
+
+      const text = await res.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(text); } catch { parsed = text; }
+      console.debug('fetchComments response for post', post.id, res.status, parsed);
+
+      // Normalize possible shapes: { success:true, data: [...] } OR [...] OR { data: [...] }
+      let list: any[] = [];
+      if (Array.isArray(parsed)) list = parsed;
+      else if (parsed && Array.isArray(parsed.data)) list = parsed.data;
+      else if (parsed && Array.isArray(parsed.comments)) list = parsed.comments;
+
+      if (list.length) {
+        setComments(list);
+        setLocalCommentCount(list.length);
+        setPreviewComments(list.slice(0, 5));
+      } else {
+        // If the comments endpoint returned nothing, try fetching the post itself
+        // (some server responses include comments on the post object)
+        try {
+          const postRes = await fetch(`${API_BASE}/api/posts/${post.id}`);
+          if (postRes.ok) {
+            const postText = await postRes.text();
+            let postParsed: any = null;
+            try { postParsed = JSON.parse(postText); } catch { postParsed = postText; }
+            const maybeComments = Array.isArray(postParsed?.data?.comments)
+              ? postParsed.data.comments
+              : (Array.isArray(postParsed?.comments) ? postParsed.comments : []);
+            if (maybeComments && maybeComments.length) {
+              setComments(maybeComments);
+              setLocalCommentCount(maybeComments.length);
+              setPreviewComments(maybeComments.slice(0, 5));
+              return;
+            }
+          }
+        } catch (e) {
+          console.debug('fetchComments fallback post fetch failed', e);
+        }
+
+        setComments([]);
+        setPreviewComments([]);
+        // If server returned something unexpected, keep comments empty but log for debugging
+        if (res.ok && !list.length) console.debug('fetchComments: no comments found in response', parsed);
+      }
+    } catch (err) {
+      console.error('Yorumları yükleme hatası:', err);
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  }
+
+  async function submitComment() {
+    if (!newComment.trim()) return;
+    setSubmittingComment(true);
+    try {
+      // Support both storage keys used in the app
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ content: newComment.trim() }),
+      });
+
+      if (!res.ok) throw new Error('Yorum gönderilemedi');
+
+      const responseData = await res.json();
+
+      // Extract the comment from the response data
+      const createdComment = responseData.data; // This is the key fix
+
+      if (createdComment) {
+        // Prepend new comment to list
+        setComments((s) => [createdComment, ...s]);
+        setLocalCommentCount((c) => c + 1);
+        // also update preview (keep most recent two)
+        setPreviewComments((p) => [createdComment, ...p].slice(0, 5));
+        setNewComment('');
+      } else {
+        throw new Error('Yorum oluşturulamadı');
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingComment(false);
+    }
+  }
+
+
+  useEffect(() => {
+    if (showComments) {
+      fetchComments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showComments]);
+
+  // Fetch a small preview of comments (1-2) for feed view so users see recent replies
+  useEffect(() => {
+    let mounted = true;
+    const fetchPreview = async () => {
+      if (!post || (localCommentCount || 0) <= 0) return;
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE}/api/posts/${post.id}/comments`, { headers });
+        if (!res.ok) return;
+        const dataText = await res.text().catch(() => null);
+        let data: any = null;
+        if (typeof dataText === 'string') {
+          try { data = JSON.parse(dataText); } catch { data = dataText; }
+        } else {
+          data = dataText;
+        }
+        const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : (Array.isArray(data?.comments) ? data.comments : []));
+        if (mounted) setPreviewComments(list.slice(0, 5));
+      } catch (e) {
+        // ignore preview errors
+        console.debug('fetchPreview error', e);
+      }
+    };
+
+    // Only fetch preview when comments are present and preview is empty
+    if (previewComments.length === 0 && (localCommentCount || 0) > 0) {
+      fetchPreview();
+    }
+
+    return () => { mounted = false; };
+  }, [localCommentCount, post?.id]);
 }
+

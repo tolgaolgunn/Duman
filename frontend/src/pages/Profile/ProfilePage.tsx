@@ -3,10 +3,10 @@ import { useParams } from 'react-router-dom';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
 import toast from 'react-hot-toast';
-import { Settings, Sparkles, X, Camera, User, Mail, Image as ImageIcon } from 'lucide-react';
-import { currentUser, mockPosts, interestOptions } from '../../lib/mockData';
+import { Settings, X, Image as ImageIcon } from 'lucide-react';
 import ImageModal from '../../components/ImageModal';
 import { Post } from '../../components/Post';
+import { mockPosts } from '../../lib/mockData';
 
 export function ProfilePage() {
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
@@ -142,11 +142,10 @@ export function ProfilePage() {
   // If routeUserId exists, show edit only when it equals the authenticated user's id.
   const isOwnProfile = routeUserId ? (Boolean(authUserId) && routeUserId === String(authUserId)) : Boolean(authUserId);
 
-  // Show only posts returned from server as "liked". Do not fall back to mock data.
-  const likedPostsData = likedPostsList;
+  const likedPostsData = mockPosts.slice(0, 3);
 
-  // userPosts will be provided by the server when available; otherwise fall back to mock data
-  const userPosts = posts.length > 0 ? posts : mockPosts.filter((post) => post.author.id === currentUser.id);
+  // userPosts will be provided by the server when available
+  const userPosts = posts;
 
 
 
@@ -243,7 +242,7 @@ export function ProfilePage() {
   const [showPostEditModal, setShowPostEditModal] = useState(false);
   const [editPostForm, setEditPostForm] = useState<{ title?: string; content: string; tags?: string; image?: string | null }>(() => ({ title: '', content: '', tags: '', image: null }));
   const [isSavingPostEdit, setIsSavingPostEdit] = useState(false);
-  const [editOptions, setEditOptions] = useState<string[]>(interestOptions);
+  const [editOptions, setEditOptions] = useState<string[]>([]);
   const [editSelectedInterests, setEditSelectedInterests] = useState<string[]>([]);
   const [editNewInterest, setEditNewInterest] = useState('');
 
@@ -646,10 +645,10 @@ export function ProfilePage() {
 
   const handleCancelEdit = () => {
     setEditForm({
-      username: currentUser.username,
-      email: currentUser.email,
-      bio: '', // bio property doesn't exist on currentUser, so keep as empty string
-      interests: currentUser.interests
+      username: profile.username,
+      email: profile.email,
+      bio: profile.bio || '',
+      interests: profile.interests || []
     });
     setNewInterest('');
     setShowEditModal(false);
@@ -923,11 +922,11 @@ export function ProfilePage() {
               <p className="text-gray-500 text-sm">Gönderi</p>
             </div>
             <div>
-              <p className="text-gray-900">{currentUser.followers.length}</p>
+              <p className="text-gray-900">0</p>
               <p className="text-gray-500 text-sm">Takipçi</p>
             </div>
             <div>
-              <p className="text-gray-900">{currentUser.following.length}</p>
+              <p className="text-gray-900">0</p>
               <p className="text-gray-500 text-sm">Takip</p>
             </div>
           </div>
@@ -1018,7 +1017,7 @@ export function ProfilePage() {
                     <img src={profile.avatar} alt={profile.username || 'avatar'} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                      <span className="text-2xl">{currentUser.avatar}</span>
+                      <span className="text-2xl">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
                     </div>
                   )}
                 </div>
@@ -1066,14 +1065,14 @@ export function ProfilePage() {
 
                   <div className="flex gap-2">
                     <input
-                        id="edit-new-interest"
-                        name="editNewInterest"
-                        type="text"
-                        placeholder="Yeni ilgi alanı ekle..."
-                        value={editNewInterest}
-                        onChange={(e) => setEditNewInterest(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none"
-                      />
+                      id="edit-new-interest"
+                      name="editNewInterest"
+                      type="text"
+                      placeholder="Yeni ilgi alanı ekle..."
+                      value={editNewInterest}
+                      onChange={(e) => setEditNewInterest(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none"
+                    />
                     <button
                       type="button"
                       onClick={() => {
@@ -1140,9 +1139,7 @@ export function ProfilePage() {
 
       {activeTab === 'liked' && (
         <div className="space-y-4">
-          {isLoadingLikedPosts ? (
-            <div className="p-6 bg-white border border-gray-200 rounded-2xl">Yükleniyor...</div>
-          ) : (likedPostsData.length > 0 ? (
+          {likedPostsData.length > 0 ? (
             likedPostsData.map((post) => (
               <div key={post.id}>
                 <Post
@@ -1161,7 +1158,7 @@ export function ProfilePage() {
               <p className="text-gray-500 mb-2">Henüz beğendiğiniz gönderi yok</p>
               <p className="text-gray-400 text-sm">Beğendiğiniz gönderiler burada görünecek</p>
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -1223,7 +1220,7 @@ export function ProfilePage() {
               <div className="flex flex-col items-center relative">
                 <div className="w-24 h-24 rounded-full flex items-center justify-center border-4 border-white shadow-lg mb-4 overflow-hidden bg-gray-100">
                   {previewUrl ? (
-                    <img src={previewUrl ?? undefined} alt="preview" className="w-full h-full object-cover" />
+                    <img src={previewUrl} alt="preview" className="w-full h-full object-cover" />
                   ) : profile.avatar ? (
                     <img src={profile.avatar} alt="avatar" className="w-full h-full object-cover" />
                   ) : (
