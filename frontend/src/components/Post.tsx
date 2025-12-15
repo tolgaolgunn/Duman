@@ -145,8 +145,6 @@ const ensureAbsoluteUrl = (src?: string) => {
   }
 };
 
-
-
 export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: PostProps) {
   const navigate = useNavigate();
 
@@ -267,7 +265,6 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
     return false;
   };
 
-
   const currentUserAvatar = useMemo(() => {
     if (!currentUser) return null;
     if (currentUser.avatar && (currentUser.avatar.startsWith('http') || currentUser.avatar.startsWith('data:'))) {
@@ -284,7 +281,6 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
     // eslint-disable-next-line no-console
     console.debug('Post component imageUrl:', (post as any).imageUrl, 'normalized:', ensureAbsoluteUrl((post as any).imageUrl));
   } catch (e) { }
-
 
   const submitComment = useCallback(async () => {
     if (!newComment.trim()) return;
@@ -344,7 +340,6 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
       setSubmittingComment(false);
     }
   }, [newComment, post.id, setComments, setLocalCommentCount, setPreviewComments]);
-
 
   const fetchComments = useCallback(async () => {
     setCommentsLoading(true);
@@ -422,7 +417,6 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
       setCurrentUser(null);
     }
   }, []);
-
 
   // 2. Yorumları Göster/Gizle durumuna göre yorumları çek
   useEffect(() => {
@@ -651,7 +645,6 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
         </div>
       </div>
 
-
       {showComments && (
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
 
@@ -692,7 +685,7 @@ export function Post({ post, onLike, onComment, isLiked, onEdit, onDelete }: Pos
               onClick={async () => { await submitComment(); commentInputRef.current?.focus(); }}
               disabled={submittingComment || !newComment.trim() || !hasAuthToken}
               aria-label="Yorumu gönder"
-              className="ml-2 p-2 rounded-full bg-blue-600 text-white disabled:opacity-60 flex items-center justify-center"
+              className="ml-2 p-2 rounded-full bg-gray-100 text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               <Send size={16} />
             </button>
