@@ -3,7 +3,7 @@ import User from '../../models/userModel.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const stripe = new Stripe('sk_test_51SebZHRSoHt6M5qffAvogvhkXx9bPcmYz3kYmR11cpg7EYo7Cr9ttfHTLxmeRYpmFQd0GXWQ8RQIJ3fvbyU8CeiX00pJtJiln3');
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Checkout Session Oluşturma
 export const createCheckoutSession = async (req, res) => {
