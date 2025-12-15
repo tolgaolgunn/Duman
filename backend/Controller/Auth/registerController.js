@@ -57,7 +57,13 @@ export const register = async (req, res) => {
     });
 
     // JWT token oluştur
-    const token = jwt.sign({ id: savedUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    // JWT token oluştur
+    const token = jwt.sign({ 
+      id: savedUser._id,
+      userId: savedUser._id,
+      username: savedUser.username,
+      avatar: savedUser.avatar
+    }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     console.log('Token created, sending response');
 

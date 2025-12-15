@@ -1,5 +1,28 @@
 import { ChatRoom, Message } from '../../models/chatModel.js';
 import User from '../../models/userModel.js';
+import mongoose from 'mongoose';
+import Notification from '../../models/notificationModel.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { v2 as cloudinary } from 'cloudinary';
+import fs from 'fs';
+import path from 'path';
+
+// Cloudinary yapılandırması (mevcut env değişkenleriyle tek seferlik)
+let cloudinaryConfigured = false;
+try {
+  if (process.env.CLOUD_NAME && process.env.CLOUD_API_KEY && process.env.CLOUD_API_SECRET) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUD_NAME,
+      api_key: process.env.CLOUD_API_KEY,
+      api_secret: process.env.CLOUD_API_SECRET,
+    });
+    cloudinaryConfigured = true;
+  } else {
+    console.warn('Cloudinary env eksik; chat görüntü uploadı yerel depoya düşecek.');
+  }
+} catch (e) {
+  console.warn('Cloudinary config hatası:', e && e.message);
+}
 
 export const createRoom = async (req, res) => {
   try {
@@ -417,18 +440,17 @@ export const deleteRoom = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { roomId, message, messageType = 'text' } = req.body;
-  const senderId = req.userId || req.user?.userId || req.user?.id;
+    const roomId = req.params.roomId || req.body.roomId; 
+    const { message, messageType = 'text' } = req.body;
+    const senderId = req.userId || req.user?.userId || req.user?.id;
 
-    // Validasyon
-    if (!roomId || !message || message.trim().length === 0) {
+    if (!message || message.trim().length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Oda ID ve mesaj zorunludur'
+        error: 'Mesaj zorunludur'
       });
     }
 
-    // Oda var mı ve kullanıcı üye mi kontrol et
     const room = await ChatRoom.findOne({
       _id: roomId,
       'participants.user': senderId,
@@ -442,54 +464,43 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Yeni mesaj oluştur
     const newMessage = new Message({
       sender: senderId,
       chatRoom: roomId,
       message: message.trim(),
       messageType,
-      isRead: [{
-        user: senderId
-      }]
+      isRead: [{ user: senderId }]
     });
 
     await newMessage.save();
 
-    // Mesajı populate et
     const populatedMessage = await Message.findById(newMessage._id)
       .populate('sender', 'name username profilePicture');
 
-    // Socket.io ile gerçek zamanlı mesaj gönder
+    // SOCKET IO REALTIME EVENT
     const io = req.app.get('io');
     if (io) {
-      io.to(roomId).emit('newMessage', {
-        message: populatedMessage,
-        roomId: roomId
-      });
+      io.to(roomId).emit('newMessage', populatedMessage);
     }
+
+    // Son mesajı güncelle
+    room.lastMessage = newMessage._id;
+    await room.save();
 
     res.status(201).json({
       success: true,
-      message: 'Mesaj gönderildi',
       data: populatedMessage
     });
 
   } catch (error) {
-    console.error('Mesaj gönderme hatası:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        error: 'Geçersiz oda ID formatı'
-      });
-    }
-    
+    console.error("sendMessage error:", error);
     res.status(500).json({
       success: false,
-      error: 'Mesaj gönderilemedi'
+      error: 'Mesaj gönderilirken bir hata oluştu'
     });
   }
 };
+
 
 // Chat mesajlarını getir
 export const getChatMessages = async (req, res) => {
@@ -809,27 +820,39 @@ export const joinRoom = async (req, res) => {
 
     // Eğer oda private ve requireApproval true ise, create a join request instead of auto-joining
     if (room.roomSettings?.isPrivate && room.roomSettings?.requireApproval) {
-      // Check if there's an existing pending request
-      const existingReq = room.joinRequests?.find(r => String(r.user) === String(userId) && r.status === 'pending');
-      if (existingReq) {
-        return res.status(202).json({ success: true, message: 'Katılma isteğiniz beklemede', data: existingReq });
-      }
-      room.joinRequests = room.joinRequests || [];
-      room.joinRequests.push({ user: userId, status: 'pending', requestedAt: new Date() });
-      await room.save();
+      // Check if user has a pending invite
+      const pendingInviteIndex = (room.invites || []).findIndex(
+        i => String(i.user) === String(userId) && i.status === 'pending'
+      );
 
-      // Notify room admins via socket about the join request
-      try {
-        const io = req.app.get('io');
-        if (io) {
-          // emit to admins --- server-side socket listeners can decide who to notify; emit public event
-          io.emit('joinRequest', { roomId: room._id, userId });
+      // If NO pending invite, then go through approval process
+      if (pendingInviteIndex === -1) {
+        // Check if there's an existing pending request
+        const existingReq = room.joinRequests?.find(r => String(r.user) === String(userId) && r.status === 'pending');
+        if (existingReq) {
+          return res.status(202).json({ success: true, message: 'Katılma isteğiniz beklemede', data: existingReq });
         }
-      } catch (err) {
-        console.warn('join request emit failed', err);
-      }
+        room.joinRequests = room.joinRequests || [];
+        room.joinRequests.push({ user: userId, status: 'pending', requestedAt: new Date() });
+        await room.save();
 
-      return res.status(202).json({ success: true, message: 'Katılma isteği gönderildi', data: { roomId: room._id } });
+        // Notify room admins via socket about the join request
+        try {
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('joinRequest', { roomId: room._id, userId });
+          }
+        } catch (err) {
+          console.warn('join request emit failed', err);
+        }
+
+        return res.status(202).json({ success: true, message: 'Katılma isteği gönderildi', data: { roomId: room._id } });
+      } else {
+        // User HAS a pending invite, so they can join immediately.
+        // Update invite status to accepted
+        room.invites[pendingInviteIndex].status = 'accepted';
+        room.invites[pendingInviteIndex].respondedAt = new Date();
+      }
     }
 
     // Otherwise, allow immediate join
@@ -927,5 +950,439 @@ export const getJoinRequests = async (req, res) => {
   } catch (error) {
     console.error('getJoinRequests error', error);
     res.status(500).json({ success: false, error: 'İstek alınamadı' });
+  }
+};
+
+export const getRoomMembers = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.userId || req.user?.userId || req.user?.id; // 
+    const room = await ChatRoom.findById(roomId).populate('participants.user', 'name username profilePicture isPremium'); 
+    
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Oda bulunamadı' });
+    }
+
+    const isParticipant = room.participants.some(p => String(p.user._id) === String(userId));
+    
+    if (!isParticipant) {
+        return res.status(403).json({ success: false, error: 'Bu odanın üye listesini görmeye yetkiniz yok.' });
+    }
+
+    const members = (room.participants || []).map((p) => ({
+        id: p.user._id,
+        username: p.user.username || p.user.name,
+        profilePicture: p.user.profilePicture,
+        isPremium: p.user.isPremium || false,
+
+        role: p.role, 
+        isAdmin: room.admins.some(adminId => String(adminId) === String(p.user._id)),
+        isOwner: String(room.createdBy) === String(p.user._id),
+    }));
+
+    res.status(200).json({ success: true, data: members });
+  } catch (error) {
+    console.error('memberListRoom error', error);
+    res.status(500).json({ success: false, error: 'İstek alınamadı' });
+  }
+};
+
+// Invite users to a room (adds pending invites)
+export const inviteRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const inviterId = req.userId || req.user?.userId || req.user?.id;
+    const { users = [] } = req.body; // array of userIds to invite
+
+    if (!Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ success: false, error: 'Davet edilecek kullanıcılar belirtilmelidir' });
+    }
+
+    const room = await ChatRoom.findById(roomId);
+    if (!room) return res.status(404).json({ success: false, error: 'Oda bulunamadı' });
+
+    const isAdmin = (room.admins || []).map(String).includes(String(inviterId));
+    const isOwner = String(room.createdBy) === String(inviterId);
+    const canInvite = isAdmin || isOwner || req.user?.isAdmin || room.roomSettings?.allowInvites;
+
+    if (!canInvite) {
+      return res.status(403).json({ success: false, error: 'Bu oda için davet yetkiniz yok' });
+    }
+
+    room.invites = room.invites || [];
+
+    const invited = [];
+    for (const u of Array.from(new Set(users.map(String)))) {
+      // skip if already participant
+      if ((room.participants || []).some(p => String(p.user) === String(u))) continue;
+      // skip if already invited pending
+      if ((room.invites || []).some(i => String(i.user) === String(u) && i.status === 'pending')) continue;
+
+      // verify user exists: accept either userId or username
+      let userExists = null;
+      try {
+        if (mongoose && mongoose.Types && mongoose.Types.ObjectId.isValid(u)) {
+          userExists = await User.findById(u).select('_id username');
+        }
+      } catch (e) {
+        userExists = null;
+      }
+      if (!userExists) {
+        // try lookup by username
+        userExists = await User.findOne({ username: String(u).trim() }).select('_id username');
+      }
+      if (!userExists) continue;
+
+      const inviteObj = {
+        user: userExists._id,
+        invitedBy: inviterId,
+        status: 'pending',
+        invitedAt: new Date()
+      };
+      room.invites.push(inviteObj);
+      invited.push({ id: String(userExists._id), username: userExists.username });
+    }
+
+    if (invited.length === 0) {
+      return res.status(200).json({ success: true, message: 'Yeni davet bulunamadı veya zaten davet edilmiş/üye', data: [] });
+    }
+
+    room.updatedAt = new Date();
+    await room.save();
+
+    const { message: inviteMessage } = req.body;
+    let createdSystemMessage = null;
+    try {
+      const inviteUsernames = invited.map(i => i.username).join(', ');
+      const systemText = inviteMessage && inviteMessage.toString().trim().length > 0
+        ? `${req.user?.username || 'Sistem'} davet gönderdi: ${inviteUsernames} — "${inviteMessage}"`
+        : `${req.user?.username || 'Sistem'} davet gönderdi: ${inviteUsernames}`;
+
+      const sysMsg = new Message({
+        sender: inviterId,
+        chatRoom: room._id,
+        message: systemText,
+        messageType: 'system'
+      });
+
+      createdSystemMessage = await sysMsg.save();
+    } catch (msgErr) {
+      console.warn('Failed to create system invite message', msgErr);
+    }
+
+    // Create persistent notifications for invited users
+    try {
+      const notificationsData = invited.map(i => ({
+        recipient: i.id,
+        sender: inviterId,
+        type: 'invite',
+        message: inviteMessage 
+          ? `${req.user?.username || 'Bir kullanıcı'} sizi "${room.name}" odasına davet etti: "${inviteMessage}"`
+          : `${req.user?.username || 'Bir kullanıcı'} sizi "${room.name}" odasına davet etti`,
+        link: `/chat/room/${roomId}`,
+        meta: {
+          roomId: room._id,
+          roomName: room.name,
+          inviterId: inviterId,
+          inviteMessage: inviteMessage
+        }
+      }));
+      
+      const createdNotifications = await Notification.insertMany(notificationsData);
+
+      // Emit socket events using the actual created notifications (with _id)
+      const io = req.app.get('io');
+      if (io) {
+        io.to(roomId).emit('roomInvitesUpdated', { roomId, invited });
+
+        if (createdSystemMessage) {
+          const populated = await Message.findById(createdSystemMessage._id)
+            .populate('sender', 'name username profilePicture');
+          io.to(roomId).emit('newMessage', { message: populated, roomId });
+        }
+
+        createdNotifications.forEach(notif => {
+          // Emit 'newNotification' which is what NotificationBell listens to
+          // We also emit 'invitedToRoom' for backward compatibility or other listeners if any
+          const recipientId = notif.recipient.toString();
+          
+          // Emit standard notification structure
+          io.to(recipientId).emit('newNotification', notif);
+
+          // Emit legacy/specific event if needed (optional, keeping it for safety)
+          io.to(recipientId).emit('invitedToRoom', { 
+            roomId, 
+            inviter: inviterId, 
+            message: inviteMessage || null,
+            notificationId: notif._id // attach ID just in case
+          });
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Failed to create/emit invite notifications', notifErr);
+    }
+
+    res.status(200).json({ success: true, message: 'Kullanıcılara davet gönderildi', data: invited });
+  } catch (error) {
+    console.error('inviteRoom error', error);
+    res.status(500).json({ success: false, error: 'Davet gönderilemedi' });
+  }
+};
+
+export const declineInvite = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.userId || req.user?.userId || req.user?.id;
+
+    const room = await ChatRoom.findById(roomId);
+    if (!room) return res.status(404).json({ success: false, error: 'Oda bulunamadı' });
+
+    const inviteIndex = (room.invites || []).findIndex(
+      i => String(i.user) === String(userId) && i.status === 'pending'
+    );
+
+    if (inviteIndex === -1) {
+      return res.status(400).json({ success: false, error: 'Bekleyen davet bulunamadı' });
+    }
+
+    // Update status to rejected
+    room.invites[inviteIndex].status = 'rejected';
+    room.invites[inviteIndex].respondedAt = new Date();
+    await room.save();
+
+    res.status(200).json({ success: true, message: 'Davet reddedildi' });
+  } catch (error) {
+    console.error('declineInvite error', error);
+    res.status(500).json({ success: false, error: 'Davet reddedilemedi' });
+  }
+};
+
+export const leaveRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.userId || req.user?.userId || req.user?.id;
+
+    const room = await ChatRoom.findById(roomId);
+    if (!room) return res.status(404).json({ success: false, error: 'Oda bulunamadı' });
+
+    // Check if participant
+    const participantIndex = room.participants.findIndex(p => String(p.user) === String(userId));
+    if (participantIndex === -1) {
+      return res.status(400).json({ success: false, error: 'Bu odanın üyesi değilsiniz' });
+    }
+
+    // Remove from participants
+    room.participants.splice(participantIndex, 1);
+
+    // Remove from admins if present
+    const adminIndex = (room.admins || []).findIndex(a => String(a) === String(userId));
+    if (adminIndex !== -1) {
+      room.admins.splice(adminIndex, 1);
+    }
+
+    // Remove from moderators if present
+    const modIndex = (room.moderators || []).findIndex(m => String(m) === String(userId));
+    if (modIndex !== -1) {
+      room.moderators.splice(modIndex, 1);
+    }
+
+    room.updatedAt = new Date();
+    await room.save();
+
+    // Emit userLeft event
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(roomId).emit('userLeft', { roomId, userId });
+        
+        // System message
+        const sysMsg = new Message({
+          sender: userId,
+          chatRoom: roomId,
+          message: `${req.user?.username || 'Bir kullanıcı'} odadan ayrıldı`,
+          messageType: 'system'
+        });
+        await sysMsg.save();
+        io.to(roomId).emit('newMessage', { message: sysMsg, roomId });
+      }
+    } catch (e) {
+      console.warn('leaveRoom socket emit failed', e);
+    }
+
+    res.status(200).json({ success: true, message: 'Odadan ayrıldınız' });
+  } catch (error) {
+    console.error('leaveRoom error', error);
+    res.status(500).json({ success: false, error: 'Odadan ayrılınamadı' });
+  }
+};
+
+export const getChatSummary = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.userId || req.user?.userId || req.user?.id;
+    
+    // Premium kontrolü
+    const enableForAll = process.env.ENABLE_GPT5_FOR_ALL_CLIENTS === 'true';
+    if (!enableForAll) {
+       const user = await User.findById(userId);
+       if (!user?.isPremium) {
+         return res.status(403).json({ success: false, error: 'Bu özellik sadece Premium üyeler içindir.' });
+       }
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      console.error('Gemini API key is missing');
+      return res.status(500).json({ success: false, error: 'AI servisi yapılandırma hatası' });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+    // 1. Oda ve Yetki Kontrolü
+    const room = await ChatRoom.findOne({
+      _id: roomId,
+      isActive: true
+    });
+
+    if (!room) {
+      return res.status(404).json({ success: false, error: 'Oda bulunamadı' });
+    }
+
+    // Katılımcı kontrolü
+    const isParticipant = room.participants.some(p => String(p.user) === String(userId));
+    if (!isParticipant) {
+      return res.status(403).json({ success: false, error: 'Bu odayı özetlemek için katılımcı olmalısınız.' });
+    }
+
+    // 2. Veri Çekme
+    const messages = await Message.find({
+      chatRoom: roomId,
+      'isRead.user': { $nin: [userId] }
+    })
+    .sort({ timestamp: 1 }) // Eskiden yeniye (artarak)
+    .limit(50)
+    .populate('sender', 'name username');
+
+    if (!messages || messages.length === 0) {
+      return res.status(200).json({ success: true, summary: '' });
+    }
+
+    // 2. Filtreleme ve Formatlama
+    const validMessages = messages.filter(msg => {
+      // type='system' ise ele
+      if (msg.messageType === 'system') return false;
+
+      // Metin içeriği kontrolü
+      const content = msg.message ? msg.message.toLowerCase() : '';
+      if (
+        content.includes('odaya katıldı') || 
+        content.includes('ayrıldı') || 
+        content.includes('davet etti')
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (validMessages.length === 0) {
+      return res.status(200).json({ success: true, summary: '' });
+    }
+
+    const formattedChat = validMessages.map(msg => {
+      const senderName = msg.sender?.name || msg.sender?.username || 'Bilinmeyen Kullanıcı';
+      return `${senderName}: ${msg.message}`;
+    }).join('\n');
+
+    // 3. Yapay Zeka Entegrasyonu
+    const systemPrompt = "Sen bir asistansın. Aşağıdaki okunmamış mesajları kullanıcı için özetle. Kimin ne dediğinden ziyade, konuşulan konuları, planları veya olayları madde madde yaz. Gereksiz selamlaşmaları ve kısa onayları atla.";
+    
+    const result = await model.generateContent([
+      systemPrompt,
+      `Mesajlar:\n${formattedChat}`
+    ]);
+    
+    const response = await result.response;
+    const text = response.text();
+
+    return res.status(200).json({ success: true, summary: text });
+
+  } catch (error) {
+    console.error('Özetleme hatası:', error);
+    return res.status(500).json({ success: false, error: 'Özet oluşturulamadı.' });
+  }
+};
+
+export const uploadFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Dosya yüklenemedi' });
+    }
+    const localPath = req.file.path || path.join(req.file.destination || path.join(process.cwd(), 'uploads', 'chat'), req.file.filename);
+
+    if (cloudinaryConfigured) {
+      try {
+        const uploadResult = await cloudinary.uploader.upload(localPath, {
+          folder: 'Duman/chat',
+          resource_type: 'image',
+          quality: 'auto:good',
+          fetch_format: 'auto',
+          timeout: 30000,
+          width: 1600,
+          height: 1600,
+          crop: 'limit'
+        });
+
+        // Görüntüyü sohbet için küçült (önizleme + optimize)
+        const optimizedUrl = cloudinary.url(uploadResult.public_id, {
+          secure: true,
+          transformation: [
+            { width: 1200, height: 1200, crop: 'limit' },
+            { quality: 'auto:good', fetch_format: 'auto' }
+          ]
+        });
+
+        const thumbUrl = cloudinary.url(uploadResult.public_id, {
+          secure: true,
+          transformation: [
+            { width: 512, height: 512, crop: 'limit' },
+            { quality: 'auto:good', fetch_format: 'auto' }
+          ]
+        });
+
+        // Yerelde oluşturulan dosyayı temizle (sessizce)
+        if (localPath) {
+          fs.unlink(localPath, () => {});
+        }
+
+        return res.status(200).json({
+          success: true,
+          url: optimizedUrl || uploadResult.secure_url,
+          thumbnailUrl: thumbUrl || optimizedUrl || uploadResult.secure_url,
+          originalUrl: uploadResult.secure_url,
+          filename: uploadResult.original_filename || req.file.originalname,
+          mimetype: req.file.mimetype,
+          publicId: uploadResult.public_id
+        });
+      } catch (cloudErr) {
+        console.error('Cloudinary upload error:', cloudErr);
+      }
+    }
+
+    // Cloudinary kapalıysa yerel upload URL'i dön
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/chat/${req.file.filename}`;
+
+    res.status(200).json({
+      success: true,
+      url: fileUrl,
+      thumbnailUrl: fileUrl,
+      originalUrl: fileUrl,
+      filename: req.file.filename,
+      mimetype: req.file.mimetype
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ success: false, error: 'Dosya yükleme hatası' });
   }
 };

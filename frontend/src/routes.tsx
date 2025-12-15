@@ -13,6 +13,9 @@ import RegisterPage from './pages/Register/RegisterPage';
 import { ForgotPasswordPage } from './pages/Login/ForgotPasswordPage';
 import ResetPasswordPage from './pages/Login/ResetPasswordPage';
 import { Sidebar } from './components/Sidebar';
+import NotificationsPage from './pages/Notifications/NotificationsPage';
+import PremiumPage from './pages/Premium/PremiumPage';
+import PaymentSuccessPage from './pages/Premium/PaymentSuccessPage';
 
 // Layout component that includes sidebar
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -38,8 +41,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <Sidebar 
-        currentPage={currentPage} 
+      <Sidebar
+        currentPage={currentPage}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
         isOpen={isSidebarOpen}
@@ -63,8 +66,8 @@ const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogin = (username: string, email: string,password: string) => {
-    console.log('Login attempt:', { username, email,password });
+  const handleLogin = (username: string, email: string, password: string) => {
+    console.log('Login attempt:', { username, email, password });
     setIsAuthenticated(true);
     localStorage.setItem('isAuthenticated', 'true');
     navigate('/home');
@@ -86,17 +89,17 @@ const AuthWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   // If not authenticated and not on auth pages, redirect to login
-  if (!isAuthenticated && !location.pathname.includes('/login') && 
-      !location.pathname.includes('/register') && 
-      !location.pathname.includes('/forgot-password')) {
+  if (!isAuthenticated && !location.pathname.includes('/login') &&
+    !location.pathname.includes('/register') &&
+    !location.pathname.includes('/forgot-password')) {
     navigate('/login');
     return null;
   }
 
   // If on auth pages, render without layout
-  if (location.pathname.includes('/login') || 
-      location.pathname.includes('/register') || 
-      location.pathname.includes('/forgot-password')) {
+  if (location.pathname.includes('/login') ||
+    location.pathname.includes('/register') ||
+    location.pathname.includes('/forgot-password')) {
     return <>{children}</>;
   }
 
@@ -115,91 +118,91 @@ const LoginPageWrapper: React.FC = () => {
   const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
 
   const handleLogin = async (username: string, password: string) => {
-  try {
-    const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
-    
-    console.log('Attempting login to:', `${API_BASE}/api/auth/login`);
-    
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        email: username, 
-        password 
-      })
-    });
+    try {
+      const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
 
-    console.log('Response status:', res.status);
+      console.log('Attempting login to:', `${API_BASE}/api/auth/login`);
 
-    if (!res.ok) {
-      // Read response text to show backend error details
-      const text = await res.text();
-      let data: any = {};
-      try { data = JSON.parse(text); } catch { data = { error: text }; }
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: username,
+          password
+        })
+      });
 
-      // Map common status codes to friendly messages and show toast
-      if (res.status === 404) {
-        const msg = data?.error || 'API endpoint bulunamadı. Backend servisi çalışıyor mu?';
+      console.log('Response status:', res.status);
+
+      if (!res.ok) {
+        // Read response text to show backend error details
+        const text = await res.text();
+        let data: any = {};
+        try { data = JSON.parse(text); } catch { data = { error: text }; }
+
+        // Map common status codes to friendly messages and show toast
+        if (res.status === 404) {
+          const msg = data?.error || 'API endpoint bulunamadı. Backend servisi çalışıyor mu?';
+          toast.error(msg);
+          throw new Error(msg);
+        }
+        if (res.status === 401) {
+          // Authentication failed (wrong email or password)
+          const serverMsg = data?.error || 'E-posta veya şifre hatalı';
+          toast.error(serverMsg);
+          throw new Error(serverMsg);
+        }
+        const otherMsg = data?.error || `HTTP ${res.status}: Giriş başarısız`;
+        toast.error(otherMsg);
+        throw new Error(otherMsg);
+      }
+
+      const data = await res.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      // Save token and mark authenticated (standardized key: 'token')
+      if (data.token) {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('isAuthenticated', 'true');
+        toast.success('Giriş başarılı');
+        navigate('/home');
+      } else {
+        throw new Error('Token alınamadı');
+      }
+
+    } catch (err: any) {
+      console.error('Login failed:', err);
+      // Network error
+      if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+        const msg = 'Sunucuya bağlanılamıyor. Backend servisi çalıştığınızdan emin olun.';
         toast.error(msg);
         throw new Error(msg);
       }
-      if (res.status === 401) {
-        // Authentication failed (wrong email or password)
-        const serverMsg = data?.error || 'E-posta veya şifre hatalı';
-        toast.error(serverMsg);
-        throw new Error(serverMsg);
-      }
-      const otherMsg = data?.error || `HTTP ${res.status}: Giriş başarısız`;
-      toast.error(otherMsg);
-      throw new Error(otherMsg);
+      // If we already showed a toast above, rethrow so the UI also receives the error
+      throw new Error(err?.message || 'Giriş sırasında beklenmeyen bir hata oluştu');
     }
-
-    const data = await res.json();
-    
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    // Save token and mark authenticated (standardized key: 'token')
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('isAuthenticated', 'true');
-      toast.success('Giriş başarılı');
-      navigate('/home');
-    } else {
-      throw new Error('Token alınamadı');
-    }
-    
-  } catch (err: any) {
-    console.error('Login failed:', err);
-    // Network error
-    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
-      const msg = 'Sunucuya bağlanılamıyor. Backend servisi çalıştığınızdan emin olun.';
-      toast.error(msg);
-      throw new Error(msg);
-    }
-    // If we already showed a toast above, rethrow so the UI also receives the error
-    throw new Error(err?.message || 'Giriş sırasında beklenmeyen bir hata oluştu');
-  }
-};
+  };
 
   return (
-    <LoginPage 
-      onNavigate={handleNavigate} 
-      onLogin={handleLogin} 
+    <LoginPage
+      onNavigate={handleNavigate}
+      onLogin={handleLogin}
     />
   );
 };
 
 const RegisterPageWrapper: React.FC = () => {
   const navigate = useNavigate();
-  
+
   const handleNavigate = (path: string) => {
     navigate(`/${path}`);
   };
-  
+
   const handleRegister = (userData: any) => {
     console.log('Registration attempt:', userData);
     localStorage.setItem('isAuthenticated', 'true');
@@ -207,20 +210,20 @@ const RegisterPageWrapper: React.FC = () => {
   };
 
   return (
-    <RegisterPage 
-      onNavigate={handleNavigate} 
-      onRegister={handleRegister} 
+    <RegisterPage
+      onNavigate={handleNavigate}
+      onRegister={handleRegister}
     />
   );
 };
 
 const ForgotPasswordPageWrapper: React.FC = () => {
   const navigate = useNavigate();
-  
+
   const handleNavigate = (path: string) => {
     navigate(`/${path}`);
   };
-  
+
   const handleResetPassword = async (email: string) => {
     const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
     try {
@@ -243,9 +246,9 @@ const ForgotPasswordPageWrapper: React.FC = () => {
   };
 
   return (
-    <ForgotPasswordPage 
-      onNavigate={handleNavigate} 
-      onResetPassword={handleResetPassword} 
+    <ForgotPasswordPage
+      onNavigate={handleNavigate}
+      onResetPassword={handleResetPassword}
     />
   );
 };
@@ -301,6 +304,30 @@ const router = createBrowserRouter([
     element: (
       <AuthWrapper>
         <TrendingPostsPage />
+      </AuthWrapper>
+    ),
+  },
+  {
+    path: '/premium',
+    element: (
+      <AuthWrapper>
+        <PremiumPage />
+      </AuthWrapper>
+    ),
+  },
+  {
+    path: '/payment/success',
+    element: (
+      <AuthWrapper>
+        <PaymentSuccessPage />
+      </AuthWrapper>
+    ),
+  },
+  {
+    path: '/notifications',
+    element: (
+      <AuthWrapper>
+        <NotificationsPage />
       </AuthWrapper>
     ),
   },

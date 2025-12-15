@@ -128,6 +128,12 @@ const chatRoomSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending','approved','denied'], default: 'pending' },
     requestedAt: { type: Date, default: Date.now }
   }],
+  invites: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    status: { type: String, enum: ['pending','accepted','declined'], default: 'pending' },
+    invitedAt: { type: Date, default: Date.now }
+  }],
   lastMessage: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'

@@ -50,7 +50,7 @@ export const getProfile = async (req, res) => {
     }
 
     const user = await User.findById(userId)
-      .select('username email interests avatar cover bio avatarPublicId coverPublicId createdAt updatedAt');
+      .select('username email interests avatar cover bio avatarPublicId coverPublicId createdAt updatedAt isPremium');
 
     if (!user) {
       return res.status(404).json({ 
@@ -61,14 +61,17 @@ export const getProfile = async (req, res) => {
 
     // Return flat response (frontend expects top-level fields)
     return res.status(200).json({
+      id: user._id,
       username: user.username,
       email: user.email,
       interests: user.interests || [],
       avatar: user.avatar,
       cover: user.cover,
       bio: user.bio,
+      bio: user.bio,
       createdAt: user.createdAt,
-      updatedAt: user.updatedAt
+      updatedAt: user.updatedAt,
+      isPremium: user.isPremium
     });
 
   } catch (error) {
@@ -187,7 +190,7 @@ export const updateProfile = async (req, res) => {
         new: true,
         runValidators: true 
       }
-    ).select('username email interests avatar cover bio createdAt updatedAt');
+    ).select('username email interests avatar cover bio createdAt updatedAt isPremium');
 
     // Return flat response so frontend can read fields directly
     return res.status(200).json({
@@ -198,7 +201,8 @@ export const updateProfile = async (req, res) => {
       cover: updatedUser.cover,
       bio: updatedUser.bio,
       createdAt: updatedUser.createdAt,
-      updatedAt: updatedUser.updatedAt
+      updatedAt: updatedUser.updatedAt,
+      isPremium: updatedUser.isPremium
     });
 
   } catch (error) {

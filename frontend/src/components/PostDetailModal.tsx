@@ -45,6 +45,35 @@ export function PostDetailModal({ post, isOpen, onClose, onLike, isLiked }: Post
     return count.toString();
   };
 
+  const Avatar: React.FC<{ src?: string; size?: 'lg' | 'sm'; alt?: string }> = ({ src, size = 'lg', alt }) => {
+    const imgClass = size === 'lg' ? 'w-12 h-12 rounded-full object-cover' : 'w-8 h-8 rounded-full object-cover';
+    const fallbackClass = size === 'lg' ? 'w-12 h-12 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center' : 'w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center';
+
+    if (src && /^https?:\/\//i.test(src)) {
+      return <img src={src} alt={alt || 'avatar'} className={imgClass} />;
+    }
+
+    const content = src ? (src.length === 1 ? src : src.charAt(0)) : (alt ? alt.charAt(0) : '?');
+    return <div className={fallbackClass} aria-hidden>{content}</div>;
+  };
+
+  const ensureAbsoluteUrl = (src?: string) => {
+    if (!src) return undefined;
+    try {
+      if (/^https?:\/\//i.test(src) || /^\/\//.test(src)) return src;
+      if (src.startsWith('/')) {
+        if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin + src;
+        return src;
+      }
+      if (src.includes('res.cloudinary.com') || src.includes('/image/upload/')) {
+        return 'https://' + src.replace(/^https?:\/\//i, '');
+      }
+      return src;
+    } catch (e) {
+      return src;
+    }
+  };
+
   const modalContent = (
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4"
@@ -76,7 +105,9 @@ export function PostDetailModal({ post, isOpen, onClose, onLike, isLiked }: Post
           <div className="p-6">
             {/* Author Info */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="text-3xl">{post.author.avatar}</div>
+              <div>{/* avatar */}
+                <Avatar src={post.author.avatar} size="lg" alt={post.author.username} />
+              </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-gray-900 font-semibold">@{post.author.username}</p>
@@ -94,10 +125,15 @@ export function PostDetailModal({ post, isOpen, onClose, onLike, isLiked }: Post
             {/* Post Image */}
             {post.imageUrl && (
               <div className="mb-4 rounded-xl overflow-hidden">
-                <img 
-                  src={post.imageUrl} 
-                  alt="" 
+                <img
+                  src={ensureAbsoluteUrl(post.imageUrl)}
+                  alt="Görsel"
                   className="w-full h-auto max-h-96 object-contain"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement?.classList.add('hidden');
+                  }}
                 />
               </div>
             )}
@@ -157,7 +193,9 @@ export function PostDetailModal({ post, isOpen, onClose, onLike, isLiked }: Post
               <div className="space-y-4 mb-6">
                 {postComments.map((comment: Comment) => (
                   <div key={comment.id} className="flex gap-3">
-                    <div className="text-2xl flex-shrink-0">{comment.author.avatar}</div>
+                    <div className="flex-shrink-0">{/** comment avatar */}
+                      <Avatar src={comment.author.avatar} size="sm" alt={comment.author.username} />
+                    </div>
                     <div className="flex-1">
                       <div className="bg-gray-50 rounded-xl p-4">
                         <div className="flex items-center gap-2 mb-1">
@@ -181,7 +219,9 @@ export function PostDetailModal({ post, isOpen, onClose, onLike, isLiked }: Post
 
             {/* Comment Input */}
             <div className="flex gap-3">
-              <div className="text-2xl flex-shrink-0">{post.author.avatar}</div>
+              <div className="flex-shrink-0">{/** input avatar */}
+                <Avatar src={post.author.avatar} size="sm" alt={post.author.username} />
+              </div>
               <div className="flex-1">
                 <textarea
                   value={commentText}

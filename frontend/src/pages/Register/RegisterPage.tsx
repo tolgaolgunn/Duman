@@ -133,7 +133,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
 
       if (!res.ok) throw new Error(data.error || data.message || `Kayıt başarısız (${res.status})`);
 
-      if (data.token) localStorage.setItem('token', data.token);
+      if (data.token) localStorage.setItem('authToken', data.token);
       onRegister(formData);
       onNavigate('home');
 
@@ -171,7 +171,7 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm">Geri</span>
         </button>
-        
+
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
@@ -285,11 +285,10 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate, onRegister }) =
                   key={interest}
                   type="button"
                   onClick={() => toggleInterest(interest)}
-                  className={`px-3 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2 ${
-                    formData.interests.includes(interest)
+                  className={`px-3 py-2 rounded-lg text-sm transition-all flex items-center justify-center gap-2 ${formData.interests.includes(interest)
                       ? 'bg-gray-200 text-gray-800'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {formData.interests.includes(interest) && <Check className="w-4 h-4" />}
                   #{interest}

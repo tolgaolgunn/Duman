@@ -1,0 +1,46 @@
+type User @table {
+  username: String!
+  email: String!
+  passwordHash: String!
+  createdAt: Timestamp!
+  displayName: String
+  profilePictureUrl: String
+  bio: String
+  deviceTokens: [String]
+}
+
+type Post @table {
+  author: User!
+  content: String!
+  createdAt: Timestamp!
+  imageUrl: String
+}
+
+type Comment @table {
+  author: User!
+  post: Post!
+  content: String!
+  createdAt: Timestamp!
+}
+
+type Like @table {
+  user: User!
+  post: Post!
+  createdAt: Timestamp!
+}
+
+type Notification @table {
+  sender: User!
+  receiver: User!
+  type: String! # Enum values: 'LIKE', 'COMMENT', 'FOLLOW'
+  isRead: Boolean!
+  createdAt: Timestamp!
+  relatedPost: Post
+  relatedComment: Comment
+}
+
+type Follow @table(key: ["follower", "following"]) {
+  follower: User!
+  following: User!
+  createdAt: Timestamp!
+}

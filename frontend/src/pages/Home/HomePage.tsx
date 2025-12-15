@@ -11,8 +11,8 @@ export function HomePage() {
   const [newPostContent, setNewPostContent] = useState('');
   // filterInterests is used to filter the feed (header filters)
   const [filterInterests, setFilterInterests] = useState<string[]>([]);
-    // postSelectedInterests is used in the new-post form to pick tags for the post
-    const [postSelectedInterests, setPostSelectedInterests] = useState<string[]>([]);
+  // postSelectedInterests is used in the new-post form to pick tags for the post
+  const [postSelectedInterests, setPostSelectedInterests] = useState<string[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [options, setOptions] = useState<string[]>(interestOptions);
   const [newInterest, setNewInterest] = useState<string>('');
@@ -20,16 +20,45 @@ export function HomePage() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  const handleLike = (postId: string) => {
-    setLikedPosts((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(postId)) {
-        newSet.delete(postId);
-      } else {
-        newSet.add(postId);
+  const handleLike = async (postId: string) => {
+    try {
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      if (!token) {
+        toast.error('Lütfen önce giriş yapın');
+        return;
       }
-      return newSet;
-    });
+      const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
+      const res = await fetch(`${API_BASE}/api/posts/${postId}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) throw new Error('Failed to toggle like');
+
+      const data = await res.json();
+      const { likes, isLiked } = data.data;
+
+      setPosts((prev) => prev.map((p) => {
+        if (p.id === postId) {
+          return { ...p, likes: likes };
+        }
+        return p;
+      }));
+
+      setLikedPosts((prev) => {
+        const newSet = new Set(prev);
+        if (isLiked) {
+          newSet.add(postId);
+        } else {
+          newSet.delete(postId);
+        }
+        return newSet;
+      });
+
+    } catch (err) {
+      console.error('Like error:', err);
+      toast.error('Beğeni işlemi başarısız');
+    }
   };
 
   const handleComment = (postId: string) => {
@@ -69,7 +98,7 @@ export function HomePage() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
         if (!token) return;
         const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';
         const res = await fetch(`${API_BASE}/api/auth/profile`, {
@@ -132,6 +161,31 @@ export function HomePage() {
           commentCount: (typeof p.commentCount === 'number') ? p.commentCount : (Array.isArray(p.comments) ? p.comments.length : 0)
         }));
         setPosts(mapped);
+
+        // Initialize liked posts based on current user
+        const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+        if (token) {
+          try {
+            const parts = token.split('.');
+            if (parts.length >= 2) {
+              const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+              const payload = JSON.parse(atob(base64));
+              const userId = payload.userId || payload.id || payload._id;
+
+              if (userId) {
+                const newLikedSet = new Set<string>();
+                mapped.forEach((p: any) => {
+                  if (Array.isArray(p.likes) && p.likes.includes(userId)) {
+                    newLikedSet.add(p.id);
+                  }
+                });
+                setLikedPosts(newLikedSet);
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing token for likes:', e);
+          }
+        }
       } catch (err) {
         console.warn('Unable to load posts', err);
       }
@@ -165,11 +219,10 @@ export function HomePage() {
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-                showFilters
-                  ? 'bg-gray-100 text-gray-800'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${showFilters
+                ? 'bg-gray-100 text-gray-800'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               <Filter className="w-5 h-5" />
               <span>Filtrele</span>
@@ -186,11 +239,10 @@ export function HomePage() {
                 <button
                   key={interest}
                   onClick={() => toggleInterestFilter(interest)}
-                  className={`px-3 py-1.5 rounded-full text-sm transition-all ${
-                    filterInterests.includes(interest)
-                      ? 'bg-gray-200 text-gray-800'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                  className={`px-3 py-1.5 rounded-full text-sm transition-all ${filterInterests.includes(interest)
+                    ? 'bg-gray-200 text-gray-800'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
                 >
                   #{interest}
                 </button>
@@ -229,25 +281,25 @@ export function HomePage() {
               rows={3}
             />
           </div>
-          
+
           {/* Image Preview */}
           {imagePreview && (
-  <div className="mt-3 relative overflow-hidden rounded-xl border border-gray-200 flex justify-center bg-gray-50">
-    <img
-      src={imagePreview}
-      alt="Preview"
-      className="max-w-full max-h-96 object-scale-down"
-      style={{ display: 'block' }}
-    />
-    <button
-      onClick={handleRemoveImage}
-      className="absolute top-1 right-1 bg-red-500 text-black rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors text-xs font-bold z-10 shadow-lg"
-    >
-      ✕
-    </button>
-  </div>
-)}
-          
+            <div className="mt-3 relative overflow-hidden rounded-xl border border-gray-200 flex justify-center bg-gray-50">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="max-w-full max-h-96 object-scale-down"
+                style={{ display: 'block' }}
+              />
+              <button
+                onClick={handleRemoveImage}
+                className="absolute top-1 right-1 bg-red-500 text-black rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors text-xs font-bold z-10 shadow-lg"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
             {/* Interests / Tags selector */}
             <div className="flex-1">
@@ -306,6 +358,8 @@ export function HomePage() {
               <input
                 type="file"
                 accept="image/*"
+                id="new-post-image"
+                name="image"
                 onChange={handleImageSelect}
                 className="hidden"
                 style={{ display: 'none' }}
@@ -315,7 +369,7 @@ export function HomePage() {
               onClick={async () => {
                 // handle share
                 if (!newPostContent.trim() && !imagePreview) return toast.error('Lütfen içerik veya resim ekleyin');
-                const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+                const token = localStorage.getItem('authToken') || localStorage.getItem('token');
                 if (!token) return toast.error('Lütfen önce giriş yapın');
 
                 const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || 'http://localhost:3000';

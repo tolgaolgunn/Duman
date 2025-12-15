@@ -11,20 +11,23 @@ const postSchema = new mongoose.Schema({
         trim: true,
         minlength: [3, 'Content must be at least 3 characters']
     },
-    // image URL stored in Cloudinary (optional)
     image: {
         type: String,
         required: false,
         trim: true
     },
-    // store cloudinary public_id (optional) for deletion/management
     imagePublicId: {
         type: String,
         required: false,
         trim: true
     },
-    
+
     interests: {
+        type: [String],
+        required: false,
+        default: []
+    },
+    likes: {
         type: [String],
         required: false,
         default: []

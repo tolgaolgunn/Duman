@@ -14,18 +14,26 @@ if (!process.env.JWT_SECRET) {
  */
 export const authenticateToken = async (req, res, next) => {
   try {
-    // 1. Authorization header kontrolü
+    // 1. Try to obtain token from multiple common locations (Authorization header, x-access-token, token header, query, body)
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authorization header missing or invalid format'
-      });
-    }
+    console.log('[AuthMiddleware] Header:', authHeader); // DEBUG
+    const xAccessToken = req.headers['x-access-token'] || req.headers['x_token'];
+    const tokenHeader = req.headers['token'];
 
-    // 2. Token extraction
-    let token = authHeader.split(' ')[1];
+    // Prefer Bearer token in Authorization header, fallback to other headers / query / body
+    let token = null;
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (xAccessToken && typeof xAccessToken === 'string') {
+      token = xAccessToken;
+    } else if (tokenHeader && typeof tokenHeader === 'string') {
+      token = tokenHeader;
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
+    } else if (req.body && req.body.token) {
+      token = req.body.token;
+    }
+    console.log('[AuthMiddleware] Token:', token ? 'Present' : 'Missing'); // DEBUG
 
     // Trim and remove accidental surrounding quotes
     if (typeof token === 'string') {
@@ -35,10 +43,10 @@ export const authenticateToken = async (req, res, next) => {
       }
     }
 
-    if (!token || token.length < 10) {
+    if (!token || typeof token !== 'string' || token.length < 10) {
       return res.status(401).json({
         success: false,
-        error: 'Invalid token'
+        error: 'Invalid or missing token'
       });
     }
 
@@ -65,21 +73,23 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // 4. Payload validation
+    // 4. Payload validation (be tolerant)
     // Support both { userId } and legacy { id } token payloads
+    // Note: don't enforce Mongo ObjectId format here — some tokens may contain legacy or numeric ids.
     const resolvedUserId = payload.userId || payload.id;
-    if (!resolvedUserId || !mongoose.Types.ObjectId.isValid(resolvedUserId)) {
-      return res.status(400).json({
+    if (!resolvedUserId) {
+      return res.status(401).json({
         success: false,
-        error: 'Invalid user identification'
+        error: 'Authentication required'
       });
     }
 
-    // 5. Attach normalized user info to request
+    // 5. Attach normalized user info to request. Keep userId as string for consistency.
     req.user = {
-      userId: resolvedUserId,
+      userId: String(resolvedUserId),
       email: payload.email || null,
-      username: payload.username || null
+      username: payload.username || null,
+      isPremium: payload.isPremium || false
     };
     // also expose userId directly for backwards compatibility
     req.userId = resolvedUserId;
@@ -102,16 +112,25 @@ export const authenticateToken = async (req, res, next) => {
  */
 export const optionalAuthenticate = async (req, res, next) => {
   try {
+    // Try multiple token sources for optional auth as well
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      req.user = null;
-      return next();
+    const xAccessToken = req.headers['x-access-token'] || req.headers['x_token'];
+    const tokenHeader = req.headers['token'];
+
+    let token = null;
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (xAccessToken && typeof xAccessToken === 'string') {
+      token = xAccessToken;
+    } else if (tokenHeader && typeof tokenHeader === 'string') {
+      token = tokenHeader;
+    } else if (req.query && req.query.token) {
+      token = req.query.token;
+    } else if (req.body && req.body.token) {
+      token = req.body.token;
     }
 
-    const token = authHeader.split(' ')[1];
-    
-    if (!token || token.length < 10) {
+    if (!token || typeof token !== 'string' || token.length < 10) {
       req.user = null;
       return next();
     }
@@ -121,13 +140,13 @@ export const optionalAuthenticate = async (req, res, next) => {
 
       // Support both payload.userId and payload.id
       const resolvedUserId = payload.userId || payload.id;
-      if (resolvedUserId && mongoose.Types.ObjectId.isValid(resolvedUserId)) {
+      if (resolvedUserId) {
         req.user = {
-          userId: resolvedUserId,
+          userId: String(resolvedUserId),
           email: payload.email || null,
           username: payload.username || null
         };
-        req.userId = resolvedUserId;
+        req.userId = String(resolvedUserId);
       } else {
         req.user = null;
       }

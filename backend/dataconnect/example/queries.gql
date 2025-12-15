@@ -1,0 +1,31 @@
+mutation CreateNewUser(
+  $username: String!
+  $email: String!
+  $passwordHash: String!
+) @auth(level: PUBLIC, insecureReason: "This mutation is for user registration and requires no authentication.") {
+  user_insert(
+    data: { username: $username, email: $email, passwordHash: $passwordHash, createdAt_expr: "request.time", id_expr: "uuidV4()" }
+  )
+}
+
+query GetUserByUsername($username: String!) @auth(level: PUBLIC, insecureReason: "This query is used to verify login information and does not require authentication.") {
+  users(where: { username: { eq: $username } }) {
+    id
+    username
+    email
+    passwordHash
+  }
+}
+
+mutation CreateNewPost($content: String!, $imageUrl: String) @auth(level: USER) {
+  post_insert(data: { content: $content, imageUrl: $imageUrl, authorId_expr: "auth.uid", createdAt_expr: "request.time", id_expr: "uuidV4()" })
+}
+
+query ListPostsByAuthor @auth(level: USER) {
+  posts(where: { authorId: { eq_expr: "auth.uid" } }) {
+    id
+    content
+    imageUrl
+    createdAt
+  }
+}

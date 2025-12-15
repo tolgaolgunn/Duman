@@ -7,8 +7,12 @@ import mongoose from 'mongoose';
 import authRoute from './routes/authRoute.js';
 import postRoute from './routes/postRoute.js';
 import chatRoute from './routes/chatRoute.js'; // Yeni chat route'u
+import notificationRoute from './routes/notificationRoute.js';
+import publicConfigRoute from './routes/publicConfigRoute.js';
 import fs from 'fs';
 import { Server as SocketIOServer } from 'socket.io';
+import * as socketManager from './lib/socketManager.js';
+import paymentRoute from './routes/paymentRoute.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -50,6 +54,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Webhook route must be defined BEFORE body parser to access raw body
+app.post('/api/payment/webhook', express.raw({ type: 'application/json' }), paymentRoute);
+
 // Body parser middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -67,6 +74,10 @@ app.use((err, req, res, next) => {
 app.use('/api/auth', authRoute);
 app.use('/api/posts', postRoute);
 app.use('/api/chat', chatRoute);
+app.use('/api/notifications', notificationRoute);
+app.use('/api/notifications', notificationRoute);
+app.use('/api/public-firebase-config', publicConfigRoute);
+app.use('/api/payment', paymentRoute); // For non-webhook routes like create-checkout-session
 
 // Ensure uploads directory exists
 try {
@@ -103,14 +114,23 @@ const io = new SocketIOServer(server, {
   }
 });
 
-// Socket.io bağlantı yönetimi
+// Provide io to socketManager so other services can emit without importing server directly
+socketManager.setIo(io);
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Kullanıcı kimlik doğrulama (opsiyonel)
   socket.on('authenticate', (userData) => {
     socket.userId = userData.userId;
-    console.log(`User ${userData.userId} authenticated`);
+    // Join a personal room so server can emit directly to this user
+    try {
+      if (userData.userId) socket.join(String(userData.userId));
+      // track in socket manager
+      if (userData.userId) socketManager.addSocket(userData.userId, socket.id);
+    } catch (e) {
+      console.warn('Failed to join user room', e && e.message);
+    }
+    console.log(`User ${userData.userId} authenticated and joined room`);
   });
 
   // Odaya katılma
@@ -195,6 +215,8 @@ io.on('connection', (socket) => {
     
     // Kullanıcı çevrimdışı durumunu bildir
     if (socket.userId) {
+      // remove from socket manager
+      socketManager.removeSocket(socket.userId, socket.id);
       socket.broadcast.emit('userStatusChange', {
         userId: socket.userId,
         isOnline: false
@@ -222,3 +244,4 @@ process.on('uncaughtException', (err) => {
 });
 
 export default app;
+export { io };

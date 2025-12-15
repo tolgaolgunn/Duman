@@ -3,8 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../../models/userModel.js";
 
 export const login = async (req, res) => {
-  
-  // Log incoming request body for debugging (will show identifier/email/username)
+
   console.log('Incoming login request body:', req.body);
 
   const { email, username, password } = req.body;
@@ -26,7 +25,12 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Geçersiz şifre' });
     }
 
-    const token = await jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+    const token = await jwt.sign({ 
+      userId: user._id,
+      username: user.username,
+      avatar: user.avatar,
+      isPremium: user.isPremium
+    }, process.env.JWT_SECRET, {
       expiresIn: '1d',
     });
 
@@ -35,6 +39,7 @@ export const login = async (req, res) => {
   user: {
     username: user.username,
     email: user.email,
+    isPremium: user.isPremium
   }
 });
   } catch (error) {

@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import Skeleton from 'react-loading-skeleton';
 import 'react-loading-skeleton/dist/skeleton.css';
-import { Home, User, MessageCircle, TrendingUp, Settings, LogOut, Sparkles } from 'lucide-react';
+import { Home, User, MessageCircle, TrendingUp, Settings, LogOut, Sparkles, Bell } from 'lucide-react';
 import ImageModal from './ImageModal';
+import NotificationBell from './NotificationBell';
 import { currentUser } from '../lib/mockData';
 
 interface SidebarProps {
   currentPage: string;
-  onNavigate: (page: string) => void; 
+  onNavigate: (page: string) => void;
   onLogout?: () => void;
   isOpen?: boolean;
   onToggle?: () => void;
 }
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onToggle }: SidebarProps) {
-  const [profile, setProfile] = useState<{ id?: string; username?: string; email?: string; interests?: string[], avatar?: string, cover?: string }>({});
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [profile, setProfile] = useState<{ id?: string; username?: string; email?: string; interests?: string[], avatar?: string, cover?: string, isPremium?: boolean }>({});
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
@@ -35,31 +37,55 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
           setIsLoadingProfile(false);
           return;
         }
-    const data = await res.json();
-  if (!mounted) return;
-    const payload = data && (data.data || data) ? (data.data || data) : data;
-    // include id so Sidebar can link to /profile/:userId
-    let resolvedId = payload._id || payload.id;
-    // Fallback: try decode JWT payload to extract userId/id if backend didn't return id
-    if (!resolvedId) {
-      try {
-        const raw = token.split('.')[1];
-        if (raw) {
-          const decoded = JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')));
-          resolvedId = decoded?.userId || decoded?.id || decoded?._id;
+        const data = await res.json();
+        if (!mounted) return;
+        const payload = data && (data.data || data) ? (data.data || data) : data;
+        // include id so Sidebar can link to /profile/:userId
+        let resolvedId = payload._id || payload.id;
+        // Fallback: try decode JWT payload to extract userId/id if backend didn't return id
+        if (!resolvedId) {
+          try {
+            const raw = token.split('.')[1];
+            if (raw) {
+              const decoded = JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')));
+              resolvedId = decoded?.userId || decoded?.id || decoded?._id;
+            }
+          } catch (e) {
+            // ignore
+          }
         }
-      } catch (e) {
-        // ignore
-      }
-    }
-    setProfile({ id: resolvedId, username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '' });
-  setIsLoadingProfile(false);
+        setProfile({ id: resolvedId, username: payload.username || '', email: payload.email || '', interests: payload.interests || [], avatar: payload.avatar || '', cover: payload.cover || '', isPremium: !!payload.isPremium });
+        setIsLoadingProfile(false);
       } catch (err) {
         console.error('Sidebar fetch profile error', err);
       }
     };
 
     fetchProfile();
+
+    // Fetch unread notifications count for badge
+    const fetchUnread = async () => {
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken') || '';
+        const API_BASE = ((import.meta as any).env?.VITE_API_BASE as string) || '';
+        const url = API_BASE ? `${API_BASE}/api/notifications` : '/api/notifications';
+        const res = await fetch(url, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const list = data && (data.notifications || data) ? (data.notifications || data) : [];
+        const count = Array.isArray(list) ? list.filter((n: any) => !n.isRead).length : 0;
+        setUnreadCount(count);
+      } catch (e) {
+        // ignore
+      }
+    };
+    // Try reading cached unread count first (fast UI), then refresh from API
+    try {
+      const cached = localStorage.getItem('duman_unread');
+      if (cached !== null) setUnreadCount(Number(cached));
+    } catch (e) { }
+
+    fetchUnread();
 
     const handleProfileUpdated = (e: Event) => {
       try {
@@ -75,16 +101,100 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       }
     };
 
+    const handleNotificationsUpdated = (e: Event) => {
+      try {
+        const custom = e as CustomEvent;
+        const detail = custom.detail as { unreadCount?: number } | undefined;
+        if (detail && typeof detail.unreadCount === 'number') setUnreadCount(detail.unreadCount);
+      } catch (err) { }
+    };
+
+    // storage event (from other tabs or local set) - update badge
+    const handleStorage = (e: StorageEvent) => {
+      try {
+        if (e.key === 'duman_unread') {
+          const v = e.newValue;
+          if (v !== null) setUnreadCount(Number(v));
+        }
+      } catch (err) { }
+    };
+
     window.addEventListener('profile-updated', handleProfileUpdated as EventListener);
+    window.addEventListener('notifications-updated', handleNotificationsUpdated as EventListener);
+    window.addEventListener('storage', handleStorage as EventListener);
 
     return () => {
       mounted = false;
       window.removeEventListener('profile-updated', handleProfileUpdated as EventListener);
+      window.removeEventListener('notifications-updated', handleNotificationsUpdated as EventListener);
+      window.removeEventListener('storage', handleStorage as EventListener);
     };
   }, []);
 
+  // Socket listener for unread count updates
+  useEffect(() => {
+    let mounted = true;
+    const setupSocket = async () => {
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+        const profileRes = await fetch('/api/auth/profile', { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+        if (!profileRes.ok) return;
+        const profileJson = await profileRes.json().catch(() => null);
+        const user = profileJson?.data || profileJson;
+        if (!user || !user.id) return;
+
+        // Prefer explicit backend base URL via VITE_API_BASE, otherwise default to localhost:3000
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE as string || 'http://localhost:3000';
+        const socketUrl = API_BASE;
+
+        // Dynamic import to avoid adding socket dependency at top-level
+        const { io } = await import('socket.io-client');
+        const socket = io(socketUrl, { transports: ['websocket'], withCredentials: true });
+
+        socket.on('connect', () => {
+          socket.emit('authenticate', { userId: user.id });
+        });
+
+        socket.on('unreadCountUpdate', (data: { count: number }) => {
+          if (!mounted) return;
+          if (typeof data?.count === 'number') setUnreadCount(data.count);
+        });
+
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    setupSocket();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleNotificationClick = async () => {
+    // Optimistic update
+    setUnreadCount(0);
+    onNavigate('notifications');
+
+    // API call to mark all as read
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+      if (token) {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE as string || '';
+        const url = API_BASE ? `${API_BASE}/api/notifications/markAllRead` : '/api/notifications/markAllRead';
+        await fetch(url, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        // Dispatch event to sync other components
+        window.dispatchEvent(new CustomEvent('notifications-updated', { detail: { unreadCount: 0 } }));
+      }
+    } catch (e) {
+      console.error('Failed to mark notifications read', e);
+    }
+  };
+
   const menuItems = [
     { id: 'home', label: 'Ana Sayfa', icon: Home },
+    { id: 'notifications', label: 'Bildirimler', icon: Bell },
     { id: 'profile', label: 'Profil', icon: User },
     { id: 'chat', label: 'Sohbet Odaları', icon: MessageCircle },
     { id: 'trending', label: 'Trendler', icon: TrendingUp },
@@ -111,9 +221,8 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
   };
 
   return (
-    <div className={`fixed left-0 top-0 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 z-50 ${
-      isOpen ? 'w-64' : 'w-16'
-    }`}>
+    <div className={`fixed left-0 top-0 h-screen bg-white border-r border-gray-200 flex flex-col transition-all duration-300 z-50 ${isOpen ? 'w-64' : 'w-16'
+      }`}>
       {/* Logo */}
       <div className="p-6 border-b border-gray-200">
         <div className={`flex items-center ${isOpen ? 'gap-3' : 'justify-center'}`}>
@@ -143,39 +252,39 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       {/* User Info */}
       {isOpen && (
         <div className="p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate(resolveProfilePath())}>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-gray-100">
-                {isLoadingProfile ? (
-                  <Skeleton circle={true} height={48} width={48} />
-                ) : profile.avatar ? (
-                  <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover cursor-zoom-in" onClick={(e) => { e.stopPropagation(); setLightboxSrc(profile.avatar || null); }} />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                    <span className="text-2xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  {isLoadingProfile ? (
-                    <Skeleton height={16} width={128} />
-                  ) : (
-                    <p className="text-gray-900 truncate">@{profile.username}</p>
-                  )}
-                  {currentUser.isPremium && (
-                    <Sparkles className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                  )}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden bg-gray-100">
+              {isLoadingProfile ? (
+                <Skeleton circle={true} height={48} width={48} />
+              ) : profile.avatar ? (
+                <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover cursor-zoom-in" onClick={(e) => { e.stopPropagation(); setLightboxSrc(profile.avatar || null); }} />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                  <span className="text-2xl text-white">{(profile.username && profile.username.charAt(0).toUpperCase()) || ''}</span>
                 </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
                 {isLoadingProfile ? (
-                  <Skeleton height={12} width={80} className="mt-2" />
+                  <Skeleton height={16} width={128} />
                 ) : (
-                  <p className="text-gray-500 text-sm">{currentUser.followers.length} takipçi</p>
+                  <p className="text-gray-900 truncate">@{profile.username}</p>
+                )}
+                {profile.isPremium && (
+                  <Sparkles className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                 )}
               </div>
-            </div>  
+              {isLoadingProfile ? (
+                <Skeleton height={12} width={80} className="mt-2" />
+              ) : (
+                <p className="text-gray-500 text-sm">Takipçi</p>
+              )}
+            </div>
           </div>
+        </div>
       )}
-      
+
       {/* Collapsed User Avatar */}
       {!isOpen && (
         <div className="p-4 border-b border-gray-100 flex justify-center cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => onNavigate(resolveProfilePath())}>
@@ -200,16 +309,38 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
-            
+
+            if (item.id === 'notifications') {
+              return (
+                <div
+                  key={item.id}
+                  className={`w-full flex items-center ${isOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-xl transition-all cursor-pointer ${isActive ? 'bg-gray-100 text-gray-800' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  title={!isOpen ? item.label : undefined}
+                  onClick={handleNotificationClick}
+                >
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="flex-shrink-0">
+                      <NotificationBell compact unreadCount={unreadCount} />
+                    </div>
+                    {isOpen && (
+                      <span className="flex items-center gap-2">
+                        <span>{item.label}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center ${isOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-gray-100 text-gray-800'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`w-full flex items-center ${isOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-xl transition-all ${isActive
+                  ? 'bg-gray-100 text-gray-800'
+                  : 'text-gray-700 hover:bg-gray-50'
+                  }`}
                 title={!isOpen ? item.label : undefined}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'text-gray-800' : 'text-gray-500'}`} />
@@ -221,35 +352,42 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
       </nav>
 
       {/* Premium Banner */}
-      {!currentUser.isPremium && isOpen && (
-        <div className="m-3 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
-          <div className="flex items-start gap-2">
-            <Sparkles className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-gray-900 mb-1">Premium'a Geç</p>
-              <p className="text-gray-600 text-sm mb-3">
-                AI asistanı ve daha fazlası
-              </p>
-              <button className="w-full px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-lg hover:from-yellow-500 hover:to-orange-500 transition-all">
-                Yükselt
-              </button>
+      {
+        !profile.isPremium && isOpen && (
+          <div className="m-3 p-4 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-200">
+            <div className="flex items-start gap-2">
+              <Sparkles className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-gray-900 mb-1">Premium'a Geç</p>
+                <p className="text-gray-600 text-sm mb-3">
+                  AI asistanı ve daha fazlası
+                </p>
+                <button
+                  onClick={() => onNavigate('premium')}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white rounded-lg hover:from-yellow-500 hover:to-orange-500 transition-all font-medium text-sm shadow-sm"
+                >
+                  Yükselt
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      
+        )
+      }
+
       {/* Collapsed Premium Icon */}
-      {!currentUser.isPremium && !isOpen && (
-        <div className="m-3 flex justify-center">
-          <div className="w-10 h-10 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-200 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-yellow-600" />
+      {
+        !profile.isPremium && !isOpen && (
+          <div className="m-3 flex justify-center cursor-pointer" onClick={() => onNavigate('premium')} title="Premium'a Geç">
+            <div className="w-10 h-10 bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl border border-yellow-200 flex items-center justify-center hover:shadow-md transition-all">
+              <Sparkles className="w-5 h-5 text-yellow-600" />
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Logout */}
       <div className="p-3 border-t border-gray-200">
-        <button 
+        <button
           onClick={onLogout}
           className={`w-full flex items-center ${isOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 text-gray-700 hover:bg-gray-50 rounded-xl transition-all`}
           title={!isOpen ? 'Çıkış Yap' : undefined}
@@ -258,6 +396,6 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isOpen = true, onTo
           {isOpen && <span>Çıkış Yap</span>}
         </button>
       </div>
-    </div>
+    </div >
   );
 }

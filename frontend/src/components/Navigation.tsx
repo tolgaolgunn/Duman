@@ -26,7 +26,7 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
   ];
 
   return (
-    <nav className={`flex space-x-1 ${className}`}>
+    <nav className={`flex items-center space-x-1 ${className}`}>
       {menuItems.map((item) => (
         <button
           key={item.id}
@@ -40,6 +40,17 @@ export const Navigation: React.FC<NavigationProps> = ({ className = '' }) => {
           {item.label}
         </button>
       ))}
+      {/* Notification bell on the right side */}
+      <div className="ml-2">
+        {/* lazy load to avoid circular imports in some setups */}
+        <React.Suspense fallback={<div>...</div>}>
+          {/* @ts-ignore */}
+          <NotificationBellLazy />
+        </React.Suspense>
+      </div>
     </nav>
   );
 };
+
+// Lazy-load NotificationBell to avoid importing in every file
+const NotificationBellLazy = React.lazy(() => import('./NotificationBell'));

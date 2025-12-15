@@ -1,0 +1,55 @@
+mutation GenerateSeedData @transaction @auth(level: PUBLIC, insecureReason: "This operation is used to seed the database with initial data and is safe to expose to the public") {
+  user_insertMany(data: [
+    {
+      id: "550e8400-e29b-41d4-a716-446655440000",
+      username: "demouser1",
+      email: "demouser1@example.com",
+      passwordHash: "hash1",
+      createdAt: "2024-04-26T12:00:00Z"
+    },
+    {
+      id: "550e8400-e29b-41d4-a716-446655440001",
+      username: "demouser2",
+      email: "demouser2@example.com",
+      passwordHash: "hash2",
+      createdAt: "2024-04-26T12:00:00Z"
+    }
+  ])
+  post_insertMany(data: [
+    {
+      id: "650e8400-e29b-41d4-a716-446655440000",
+      authorId: "550e8400-e29b-41d4-a716-446655440000",
+      content: "Example post from demouser1",
+      createdAt: "2024-04-26T12:15:00Z"
+    },
+    {
+      id: "650e8400-e29b-41d4-a716-446655440001",
+      authorId: "550e8400-e29b-41d4-a716-446655440001",
+      content: "Example post from demouser2",
+      createdAt: "2024-04-26T12:20:00Z"
+    }
+  ])
+  comment_insertMany(data: [
+    {
+      id: "750e8400-e29b-41d4-a716-446655440000",
+      authorId: "550e8400-e29b-41d4-a716-446655440000",
+      postId: "650e8400-e29b-41d4-a716-446655440000",
+      content: "Example comment from demouser1 on demouser1's post",
+      createdAt: "2024-04-26T12:30:00Z"
+    },
+    {
+      id: "750e8400-e29b-41d4-a716-446655440001",
+      authorId: "550e8400-e29b-41d4-a716-446655440001",
+      postId: "650e8400-e29b-41d4-a716-446655440001",
+      content: "Example comment from demouser2 on demouser2's post",
+      createdAt: "2024-04-26T12:35:00Z"
+    }
+  ])
+  follow_insertMany(data: [
+    {
+      followerId: "550e8400-e29b-41d4-a716-446655440000",
+      followingId: "550e8400-e29b-41d4-a716-446655440001",
+      createdAt: "2024-04-26T12:40:00Z"
+    }
+  ])
+}

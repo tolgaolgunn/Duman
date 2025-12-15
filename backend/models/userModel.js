@@ -22,8 +22,11 @@ const userSchema = new mongoose.Schema({
   interests: {
     type: [String],
     default: []
-  }
-  ,
+  },
+  isPremium: {
+    type: Boolean,
+    default: false
+  },
   bio: {
     type: String,
     default: ''
@@ -44,6 +47,17 @@ const userSchema = new mongoose.Schema({
   coverPublicId: {
     type: String,
     default: ''
+  }
+  ,
+  // FCM device tokens for push notifications (mobile/offline)
+  deviceTokens: {
+    type: [String],
+    default: []
+  },
+  // Optional per-user notification preferences
+  notificationPreferences: {
+    type: Object,
+    default: {}
   }
 }, { 
   timestamps: true 
